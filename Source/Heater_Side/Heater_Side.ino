@@ -60,7 +60,7 @@ void handleRS485Event()
   {
     size_t dataSize = rs485.readBytesUntil('$', cmdBuffer, 16);
     cmdBuffer[dataSize] = '\0';
-    debug(F("Command:\t")); debugln(cmdBuffer); debugln(pumpCMD);
+    debug(F("Command:\t")); debugln(cmdBuffer);
 
     if(strcmp(cmdBuffer,pumpCMD)==0)
     {
@@ -68,7 +68,7 @@ void handleRS485Event()
 
       size_t dataSize = rs485.readBytesUntil('$', cmdBuffer, 16);
       cmdBuffer[dataSize] = '\0';
-      debug(F("Arg1:\t")); debugln(cmdBuffer);
+      debug(F("Enable:\t")); debugln(cmdBuffer);
 
       if(atoi(cmdBuffer))
       {

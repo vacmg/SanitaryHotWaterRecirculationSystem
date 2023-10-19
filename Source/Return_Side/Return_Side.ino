@@ -11,7 +11,7 @@ const uint8_t rxPin = 6; // Serial data in pin
 const uint8_t txPin = 3; // Serial data out pin
 
 #warning Change this pin to an actual relay
-const uint8_t pumpRelayPin = 13;
+const uint8_t valveRelayPin = 13;
 
 MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module constructor
 
@@ -19,10 +19,16 @@ char cmdBuffer[17] = "";
 
 bool triggerVal = false; // TODO remove this
 
+
+void error()
+{
+  #warning TODO error handler
+}
+
 void setup() 
 {
-  pinMode(pumpRelayPin,OUTPUT);
-  digitalWrite(pumpRelayPin,PDISABLED);
+  pinMode(valveRelayPin,OUTPUT);
+  digitalWrite(valveRelayPin,PDISABLED);
 
   Serial.begin(9600); // Used for debug purposes
   delay(1000);
@@ -42,11 +48,65 @@ bool triggerActive()
   return triggerVal;
 }
 
-void triggerHandler()
+void triggerHandler() // TODO rehacer con FSM (estados)
 {
   char buffer[17];
 
-  
+  sprintf(buffer, "%s%s$", HEADER, tempCMD);
+  rs485.print(buffer);
+
+  if(rs485.find(HEADER))
+  {
+    size_t dataSize = rs485.readBytesUntil('$', cmdBuffer, 16);
+    cmdBuffer[dataSize] = '\0';
+    debug(F("Command Answer:\t")); debugln(buffer);
+
+    if(strcmp(cmdBuffer,tempCMD)==0)
+    {
+      debugln(F("TEMP CMD PARSED"));
+
+      size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+      cmdBuffer[dataSize] = '\0';
+      debug(F("Temp:\t")); debugln(buffer);
+
+      if(atoi(cmdBuffer))
+      {
+        pumpPMillis = millis();
+        pumpEnabled = true;
+        digitalWrite(pumpRelayPin,PENABLED);
+
+        debug(F("Starting pump at millis() = ")); debugln(pumpPMillis);
+      }
+      else
+      {
+        digitalWrite(pumpRelayPin,PDISABLED);
+
+        debug(F("Stoping pump... ")); 
+        #if DEBUG
+          if(pumpEnabled)
+          {
+            debug(F("Elapsed time = "));
+            debug(millis() - pumpPMillis);debug(F("ms)"));
+          }
+        #endif
+        debugln();
+
+        pumpEnabled = false;
+      }
+
+      sprintf(cmdBuffer,"%s%s$",HEADER,OKCMD);
+
+      debug(F("Sending OK CMD: ")); debugln(cmdBuffer);
+
+      rs485.print(cmdBuffer);
+    }
+    else if(strcmp(cmdBuffer,tempCMD)==0);
+  }
+  else
+  {
+    debugln("ERROR TIMEOUT AT TEMP RESPONSE");
+    error();
+  }
 }
 
 #warning Remove this debug interface
@@ -58,7 +118,7 @@ void serialEvent()
 
   Serial.print(F("The user input: ")); Serial.println(buffer);
 
-  else if(strcmp(buffer,"e") == 0)
+  if(strcmp(buffer,"e") == 0)
   {
     Serial.println(F("Enabling trigger"));
     triggerVal = true;
