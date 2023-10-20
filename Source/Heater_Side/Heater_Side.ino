@@ -23,10 +23,10 @@ unsigned long pumpPMillis = 0;
 void setup() 
 {
   pinMode(pumpRelayPin,OUTPUT);
-  digitalWrite(pumpRelayPin,PDISABLED);
+  digitalWrite(pumpRelayPin,RELAY_DISABLED);
 
   Serial.begin(9600); // Used for debug purposes
-  delay(1000);
+  delay(3000);
 
   debugln(F("\nSanitaryHotWaterRecirculationSystem - Heater side system successfully started!!!"));
 
@@ -43,10 +43,10 @@ float getTemp()
 
 void autoDisablePumpIfTimeout()
 {
-  if(pumpEnabled && millis() - pumpPMillis > autoDisablePumpTimeout) // usar esta version para evitar overflow issues
+  if(pumpEnabled && millis() - pumpPMillis > autoDisablePumpTimeout)
   {
     pumpEnabled = false;
-    digitalWrite(pumpRelayPin,PDISABLED);
+    digitalWrite(pumpRelayPin,RELAY_DISABLED);
 
     debug(F("ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = "));
     debug(millis() - pumpPMillis); debug(F("ms > Timeout = "));
@@ -74,13 +74,13 @@ void handleRS485Event()
       {
         pumpPMillis = millis();
         pumpEnabled = true;
-        digitalWrite(pumpRelayPin,PENABLED);
+        digitalWrite(pumpRelayPin,RELAY_ENABLED);
 
         debug(F("Starting pump at millis() = ")); debugln(pumpPMillis);
       }
       else
       {
-        digitalWrite(pumpRelayPin,PDISABLED);
+        digitalWrite(pumpRelayPin,RELAY_DISABLED);
 
         debug(F("Stoping pump... ")); 
         #if DEBUG
