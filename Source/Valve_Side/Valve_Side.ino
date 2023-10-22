@@ -16,7 +16,7 @@ const uint8_t valveRelayPin = 13;
 MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module constructor
 
 typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
-#define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debug(statusToString(status));} while(0)
+#define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
 
 int heaterTemp = 0;
 int desiredTemp = INT16_MAX;
@@ -48,27 +48,73 @@ void error()
   while (1);
 }
 
-void setup() 
+bool getValveTempIfNecessary()
 {
-  pinMode(valveRelayPin,OUTPUT);
-  digitalWrite(valveRelayPin,RELAY_DISABLED); // TODO check valve feedback pin
+  if(millis() - valveTempPMillis > valveTempGatheringPeriod) // each sec update valve temp & compare 
+  {
+    #warning TODO valve temp sensor reading
+    debug(F("Current valve temp:\t"));
+    valveTemp = valveTemp; // TODO
+    debug(valveTemp); debug(F("\tDesired temp:\t"));debugln(desiredTemp);
 
-  Serial.begin(9600); // Used for debug purposes
-  delay(3000);
-
-  debugln(F("\nSanitaryHotWaterRecirculationSystem - Valve side system successfully started!!!"));
-
-  Serial.println(F("\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
-
-  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
-
-  delay(1000);
+    valveTempPMillis = millis();
+    return true;
+  }
+  return false;
 }
 
-float getValveTemp()
+bool getHeaterTempIfNecessary()
 {
-  #warning Implement DS18B20 logic
-  return 63.38; // TODO implement DS18B20 logic
+  char buffer[17];
+  if(millis() - heaterTempPMillis > heaterTempGatheringPeriod) // each 10 secs update heater temp
+  {
+    sprintf(buffer,"%s%s$",HEADER,tempCMD);
+    rs485.print(buffer);
+    debugln(F("HEATER TEMP REQUEST CMD SENT"));
+
+    delay(tempMessageProcessingMultiplier*receivedMessageTimeout);
+
+    if(rs485.available() && rs485.find(HEADER))
+    {
+      size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+      buffer[dataSize] = '\0';
+
+      if(strcmp(buffer, tempCMD) == 0)
+      {
+        size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+        buffer[dataSize] = '\0';
+        
+        debug(F("Heater Temp updated from ")); debug(heaterTemp);
+        heaterTemp = atoi(buffer);
+        debug(F(" to ")); debugln(heaterTemp);
+
+        debug(F("Desired Temp updated from ")); debug(desiredTemp);
+
+        if(status == ServingWater)
+        {
+          desiredTemp = round(heaterTemp*pipeHeatTransportEfficiency*coldWaterTemperatureMultiplier);
+        }
+        else
+        {
+          desiredTemp = round(heaterTemp*pipeHeatTransportEfficiency);
+        }
+        
+        debug(F(" to ")); debugln(desiredTemp);
+      }
+      else 
+      {
+        error();
+      }
+    }
+    else 
+    {
+      error();
+    }
+
+    heaterTempPMillis = millis();
+    return true;
+  }
+  return false;
 }
 
 #warning Implement real trigger code
@@ -103,6 +149,23 @@ void serialEvent()
   }
 
   Serial.println(F("\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+}
+
+void setup() 
+{
+  pinMode(valveRelayPin,OUTPUT);
+  digitalWrite(valveRelayPin,RELAY_DISABLED); // TODO check valve feedback pin
+
+  Serial.begin(9600); // Used for debug purposes
+  delay(3000);
+
+  debugln(F("\nSanitaryHotWaterRecirculationSystem - Valve side system successfully started!!!"));
+
+  Serial.println(F("\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+
+  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+
+  delay(1000);
 }
 
 void loop() 
@@ -147,74 +210,49 @@ void loop()
 
     case DrivingWater:
 
-      if(millis() - heaterTempPMillis > heaterTempGatheringPeriod) // each 10 secs update heater temp
-      {
-        sprintf(buffer,"%s%s$",HEADER,tempCMD);
-        rs485.print(buffer);
-        debugln(F("HEATER TEMP REQUEST CMD SENT"));
+      getHeaterTempIfNecessary();
 
-        delay(tempMessageProcessingMultiplier*receivedMessageTimeout);
+      if(getValveTempIfNecessary() && valveTemp >= desiredTemp) // compare temps & change phase
+      {
+        sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
+        rs485.print(buffer);
+        debugln(F("PUMP OFF CMD SENT"));
+        delay(pumpMessageProcessingMultiplier*receivedMessageTimeout);
 
         if(rs485.available() && rs485.find(HEADER))
         {
           size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
           buffer[dataSize] = '\0';
 
-          if(strcmp(buffer, tempCMD) == 0)
+          if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
           {
-            size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-            buffer[dataSize] = '\0';
-            
-            debug(F("Heater Temp updated from ")); debug(heaterTemp);
-            heaterTemp = atoi(buffer);
-            debug(F(" to ")); debugln(heaterTemp);
+            debugln(F("PUMP CMD RESULT: OK"));
 
-            debug(F("Desired Temp updated from ")); debug(desiredTemp);
-            desiredTemp = round(heaterTemp*pipeHeatTransportEfficiency);
-            debug(F(" to ")); debugln(desiredTemp);
+            heaterTempPMillis = 0; // Set millis timers
+            valveTempPMillis = 0;
+            changeStatus(DrivingWater);
           }
           else 
           {
             error();
           }
         }
-        else 
-        {
-          error();
-        }
 
-        heaterTempPMillis = millis();
+        digitalWrite(valveRelayPin, RELAY_ENABLED);
+        changeStatus(ServingWater);
       }
-
-      if(millis() - valveTempPMillis > valveTempGatheringPeriod) // each sec update valve temp & compare 
-      {
-        #warning TODO valve temp sensor reading
-        debug(F("Current valve temp:\t"));
-        valveTemp = valveTemp; // TODO
-        debug(valveTemp); debug(F("\tDesired temp:\t"));debugln(desiredTemp);
-
-
-
-
-
-
-
-        if(valveTemp >= desiredTemp) // compare temps & change phase
-        {
-          digitalWrite(valveRelayPin, RELAY_ENABLED);
-          changeStatus(ServingWater);
-        }
-
-        valveTempPMillis = millis();
-      }
-
-      
 
     break;
 
     case ServingWater:
 
-      //
+      getHeaterTempIfNecessary();
+
+      if(getValveTempIfNecessary() && !isTriggerActive() && valveTemp < desiredTemp)
+      {
+        digitalWrite(valveRelayPin, RELAY_DISABLED);
+        changeStatus(WaitingCold);
+      }
 
     break;
   }

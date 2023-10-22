@@ -11,6 +11,7 @@ const long autoDisablePumpTimeout = 120000; // 2 min
 const int heaterTempGatheringPeriod = 10000; // 10 s
 const int valveTempGatheringPeriod = 1000; // 1 s
 const float pipeHeatTransportEfficiency = 0.9; // 90% of the temperature at the heater should get into the valve
+const float coldWaterTemperatureMultiplier = 0.9; // The temperature at wich the systems closes the valve is desiredTemp*coldWaterTemperatureMultiplier
 
 const int pumpMessageProcessingMultiplier = 2;
 const int tempMessageProcessingMultiplier = 2;
