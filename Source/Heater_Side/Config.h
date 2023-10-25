@@ -6,6 +6,7 @@
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED
 
+const int watchdogResetPeriod = 6000; // 7.5 s
 const int receivedMessageTimeout = 100; // 100 ms
 const long autoDisablePumpTimeout = 120000; // 2 min
 const int heaterTempGatheringPeriod = 10000; // 10 s
@@ -15,13 +16,14 @@ const float coldWaterTemperatureMultiplier = 0.9; // The temperature at wich the
 
 const int pumpMessageProcessingMultiplier = 2;
 const int tempMessageProcessingMultiplier = 2;
+const int wdtRstMessageProcessingMultiplier = 2;
 
 // Command structure: "SHWRS_{CMD$}[ARG$]*"
 char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages
 const char pumpCMD[] = "PUMP";
 const char tempCMD[] = "TEMP";
 const char OKCMD[] = "OK";
-const char WTDRSTCMD[] = "WTD_RST"; // TODO implement error logic
+const char WTDRSTCMD[] = "WTD_RST";
 
 #if DEBUG
   #define debug(...) do {Serial.print(__VA_ARGS__); Serial.flush();} while(0)

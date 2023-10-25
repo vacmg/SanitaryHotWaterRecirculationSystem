@@ -1,7 +1,8 @@
 /**
- * This example shows how to send & receive a message between 2 modules
+ * This is the source code of the part of the system which is near to the return valve.
  */
 
+#include<avr/wdt.h> /* Header for watchdog timers in AVR */
 #include <MAX_RS485.h>
 #include "Config.h"
 
@@ -22,6 +23,7 @@ int heaterTemp = 0;
 int desiredTemp = INT16_MAX;
 unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
+unsigned long watchdogsPMillis = 0;
 Status status = WaitingCold;
 
 bool triggerVal = false; // TODO remove this
@@ -151,8 +153,49 @@ void serialEvent()
   Serial.println(F("\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
 }
 
+void resetWatchdogs()
+{
+  char buffer[17];
+  if(millis() - watchdogsPMillis > watchdogResetPeriod) // Reset both watchdogs once in a watchdogResetPeriod
+  {
+    wdt_reset();
+    watchdogsPMillis = millis();
+
+    sprintf(buffer,"%s%s$",HEADER,WTDRSTCMD);
+
+    debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
+
+    rs485.print(buffer);
+
+    delay(wdtRstMessageProcessingMultiplier*receivedMessageTimeout);
+
+    if(rs485.available() && rs485.find(HEADER))
+    {
+      size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+      buffer[dataSize] = '\0';
+
+      if(strcmp(buffer,OKCMD)==0)
+      {
+        debugln(F("WTD_RST CMD RESULT: OK"));
+      }
+      else
+      {
+        error();
+      }
+    }
+    else
+    {
+      error();
+    }
+  }
+}
+
 void setup() 
 {
+  wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
+  delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+
   pinMode(valveRelayPin,OUTPUT);
   digitalWrite(valveRelayPin,RELAY_DISABLED); // TODO check valve feedback pin
 
@@ -256,5 +299,5 @@ void loop()
 
     break;
   }
-  // TODO reset_both_watchdogs();
+  resetWatchdogs();
 }

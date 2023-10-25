@@ -1,8 +1,8 @@
 /**
  * This is the source code of the part of the system which is near to the heater source.
- * This code
  */
 
+#include<avr/wdt.h> /* Header for watchdog timers in AVR */
 #include <MAX_RS485.h>
 #include "Config.h"
 
@@ -22,11 +22,13 @@ unsigned long pumpPMillis = 0;
 
 void setup() 
 {
+  wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
+  delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+
   pinMode(pumpRelayPin,OUTPUT);
   digitalWrite(pumpRelayPin,RELAY_DISABLED);
-
   Serial.begin(9600); // Used for debug purposes
-  delay(3000);
 
   debugln(F("\nSanitaryHotWaterRecirculationSystem - Heater side system successfully started!!!"));
 
@@ -62,7 +64,18 @@ void handleRS485Event()
     cmdBuffer[dataSize] = '\0';
     debug(F("Command:\t")); debugln(cmdBuffer);
 
-    if(strcmp(cmdBuffer,pumpCMD)==0)
+    if(strcmp(cmdBuffer,WTDRSTCMD) == 0)
+    {
+      wdt_reset();
+      debugln(F("Watchdog Reset CMD PARSED"));
+
+      sprintf(cmdBuffer,"%s%s$",HEADER,OKCMD);
+
+      debug(F("Sending OK CMD: ")); debugln(cmdBuffer);
+
+      rs485.print(cmdBuffer);
+    }
+    else if(strcmp(cmdBuffer,pumpCMD)==0)
     {
       debugln(F("PUMP CMD PARSED"));
 
