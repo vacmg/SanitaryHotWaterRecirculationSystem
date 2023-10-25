@@ -3,6 +3,7 @@
  */
 
 #include<avr/wdt.h> /* Header for watchdog timers in AVR */
+#include <EEPROM.h>
 #include <MAX_RS485.h>
 #include "Config.h"
 
@@ -18,6 +19,18 @@ MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module cons
 
 typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
+
+const int ERROR_REGISTER_ADDRESS = 10;
+const int NUM_OF_ERROR_TYPES = 1;
+typedef enum {NO_ERROR = 0} ErrorType;
+typedef struct 
+{
+  bool flags[NUM_OF_ERROR_TYPES];
+  
+} 
+ErrorData;
+
+ErrorData errorData = {};
 
 int heaterTemp = 0;
 int desiredTemp = INT16_MAX;
@@ -43,10 +56,12 @@ const char* statusToString(Status status)
   }
 }
 
-void error()
+void error(ErrorType err)
 {
   #warning TODO error handler
   debugln(F("\n\nERROR\n"));
+
+  EEPROM.put(ERROR_REGISTER_ADDRESS,errorData);
   while (1);
 }
 
@@ -201,6 +216,8 @@ void setup()
 
   Serial.begin(9600); // Used for debug purposes
   delay(3000);
+
+  EEPROM.get(ERROR_REGISTER_ADDRESS, errorData);
 
   debugln(F("\nSanitaryHotWaterRecirculationSystem - Valve side system successfully started!!!"));
 
