@@ -23,8 +23,10 @@ unsigned long pumpPMillis = 0;
 void setup() 
 {
   wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
-  delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
-  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+  #if !DISABLE_WATCHDOGS
+    delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+  #endif
 
   pinMode(pumpRelayPin,OUTPUT);
   digitalWrite(pumpRelayPin,RELAY_DISABLED);

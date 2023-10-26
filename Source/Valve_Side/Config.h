@@ -2,6 +2,7 @@
 #define CONFIG_H
 
 #define DEBUG 1
+#define DISABLE_WATCHDOGS 1
 
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED

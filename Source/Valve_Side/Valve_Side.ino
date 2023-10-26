@@ -20,17 +20,22 @@ MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module cons
 typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
 
-const int ERROR_REGISTER_ADDRESS = 10;
-const int NUM_OF_ERROR_TYPES = 1;
-typedef enum {NO_ERROR = 0} ErrorType;
+typedef enum {NO_ERROR = 0, ERROR_EEPROM_CORRUPTED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,             ENUM_LEN} ErrorCode;
+#define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
+
+#define ERROR_REGISTER_ADDRESS 0
+#define EEPROM_SIZE 1024
+#define EEPROM_ERROR_MAGIC_STR "E"
+#define ERROR_MESSAGE_SIZE (EEPROM_SIZE-(sizeof(char))-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
+#define CLEAR_EEPROM true
+
 typedef struct 
 {
+  char magic[2] = EEPROM_ERROR_MAGIC_STR;
   bool flags[NUM_OF_ERROR_TYPES];
-  
+  char message[NUM_OF_ERROR_TYPES][ERROR_MESSAGE_SIZE];
 } 
 ErrorData;
-
-ErrorData errorData = {};
 
 int heaterTemp = 0;
 int desiredTemp = INT16_MAX;
@@ -38,6 +43,7 @@ unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
 unsigned long watchdogsPMillis = 0;
 Status status = WaitingCold;
+ErrorData errorData;
 
 bool triggerVal = false; // TODO remove this
 int valveTemp = 0; // TODO remove this
@@ -56,14 +62,59 @@ const char* statusToString(Status status)
   }
 }
 
-void error(ErrorType err)
+
+const char* getErrorName(ErrorCode error) 
+{
+  switch (error) 
+  {
+    case NO_ERROR:
+      return "NO_ERROR";
+    case ERROR_EEPROM_CORRUPTED:
+      return "ERROR_EEPROM_CORRUPTED";
+    case ERROR_RS485_NO_RESPONSE:
+      return "ERROR_RS485_NO_RESPONSE";
+    case ERROR_RS485_UNEXPECTED_MESSAGE:
+      return "ERROR_RS485_UNEXPECTED_MESSAGE";
+    default:
+      return "Unknown Error";
+  }
+}
+
+void printErrorData(ErrorData& data, bool printAll = false)
+{
+  if(strcmp(errorData.magic,EEPROM_ERROR_MAGIC_STR) == 0)
+  {
+    Serial.println(F("Error list:\n"));
+    for(uint8_t i = NO_ERROR + 1; i<NUM_OF_ERROR_TYPES;i++)
+    {
+      if(printAll || data.flags[i])
+      {
+        debug(getErrorName(i)); debug(F(":\t"));
+        debugln(data.flags[i]?data.message[i]:"NO_ERROR");
+      }
+    }
+  }
+  else
+  {
+    Serial.println(F("ErrorData is not valid\n"));
+  }
+  
+}
+
+
+void error(ErrorCode err, const char* message)
 {
   #warning TODO error handler
-  debugln(F("\n\nERROR\n"));
+  debug(F("\n\nERROR ")); debug(getErrorName(err)); debug(F(":\n"));
+  debugln(message);
 
   EEPROM.put(ERROR_REGISTER_ADDRESS,errorData);
+
+  debugln(F("System will be reset now\n"));
+
   while (1);
 }
+
 
 bool getValveTempIfNecessary()
 {
@@ -79,6 +130,7 @@ bool getValveTempIfNecessary()
   }
   return false;
 }
+
 
 bool getHeaterTempIfNecessary()
 {
@@ -120,12 +172,14 @@ bool getHeaterTempIfNecessary()
       }
       else 
       {
-        error();
+        char message[64];
+        sprintf(message,"Expected 'TEMP';\tReceived '%s'",buffer);
+        error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
       }
     }
     else 
     {
-      error();
+      error(ERROR_RS485_NO_RESPONSE,"Timeout receiving TEMP CMD ANSWER");
     }
 
     heaterTempPMillis = millis();
@@ -168,6 +222,7 @@ void serialEvent()
   Serial.println(F("\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
 }
 
+
 void resetWatchdogs()
 {
   char buffer[17];
@@ -193,23 +248,28 @@ void resetWatchdogs()
       {
         debugln(F("WTD_RST CMD RESULT: OK"));
       }
-      else
+      else 
       {
-        error();
+        char message[64];
+        sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+        error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
       }
     }
-    else
+    else 
     {
-      error();
+      error(ERROR_RS485_NO_RESPONSE,"Timeout receiving WTD_RST CMD ANSWER");
     }
   }
 }
 
+
 void setup() 
 {
   wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
-  delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
-  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+  #if !DISABLE_WATCHDOGS
+    delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+  #endif
 
   pinMode(valveRelayPin,OUTPUT);
   digitalWrite(valveRelayPin,RELAY_DISABLED); // TODO check valve feedback pin
@@ -218,8 +278,32 @@ void setup()
   delay(3000);
 
   EEPROM.get(ERROR_REGISTER_ADDRESS, errorData);
+  if(strcmp(errorData.magic,EEPROM_ERROR_MAGIC_STR) != 0 || CLEAR_EEPROM)
+  {
+    #if CLEAR_EEPROM
+      debugln(F("Clearing EEPROM..."));
+    #endif
+
+    debug(F("EEPROM EMPTY OR CORRUPTED\nRestoring it...\t"));
+    memset(&errorData,'\0',sizeof(errorData));
+    strcpy(errorData.magic,EEPROM_ERROR_MAGIC_STR);
+
+    #if !CLEAR_EEPROM
+      errorData.flags[ERROR_EEPROM_CORRUPTED] = true;
+      strcpy(errorData.message[ERROR_EEPROM_CORRUPTED], "EEPROM EMPTY OR CORRUPTED");
+    #endif
+
+    EEPROM.put(ERROR_REGISTER_ADDRESS, errorData);
+
+    EEPROM.get(ERROR_REGISTER_ADDRESS, errorData);
+    printErrorData(errorData,true);
+
+    debugln(F("DONE"));
+  }
 
   debugln(F("\nSanitaryHotWaterRecirculationSystem - Valve side system successfully started!!!"));
+
+  //printErrorData(errorData);
 
   Serial.println(F("\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
 
@@ -227,6 +311,7 @@ void setup()
 
   delay(1000);
 }
+
 
 void loop() 
 {
@@ -257,12 +342,14 @@ void loop()
           }
           else 
           {
-            error();
+            char message[64];
+            sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+            error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
           }
         }
         else 
         {
-          error();
+          error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
         }
       }
 
@@ -294,8 +381,14 @@ void loop()
           }
           else 
           {
-            error();
+            char message[64];
+            sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+            error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
           }
+        }
+        else 
+        {
+          error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
         }
 
         digitalWrite(valveRelayPin, RELAY_ENABLED);
