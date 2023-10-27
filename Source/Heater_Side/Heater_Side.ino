@@ -20,28 +20,14 @@ char cmdBuffer[17] = "";
 bool pumpEnabled = false;
 unsigned long pumpPMillis = 0;
 
-void setup() 
-{
-  wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
-  delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
-  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
 
-  pinMode(pumpRelayPin,OUTPUT);
-  digitalWrite(pumpRelayPin,RELAY_DISABLED);
-  Serial.begin(9600); // Used for debug purposes
-
-  debugln(F("\nSanitaryHotWaterRecirculationSystem - Heater side system successfully started!!!"));
-
-  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
-
-  delay(1000);
-}
 
 float getTemp()
 {
   #warning Implement DS18B20 logic
   return 63.38; // TODO implement DS18B20 logic
 }
+
 
 void autoDisablePumpIfTimeout()
 {
@@ -56,26 +42,34 @@ void autoDisablePumpIfTimeout()
   }
 }
 
+
 void handleRS485Event()
 {
   if(rs485.available() && rs485.find(HEADER))
   {
     size_t dataSize = rs485.readBytesUntil('$', cmdBuffer, 16);
     cmdBuffer[dataSize] = '\0';
-    debug(F("Command:\t")); debugln(cmdBuffer);
+    //debug(F("Command:\t")); debugln(cmdBuffer);
 
+    #if !DISABLE_WATCHDOGS
     if(strcmp(cmdBuffer,WTDRSTCMD) == 0)
     {
       wdt_reset();
+      #if DEBUGWATCHDOG
       debugln(F("Watchdog Reset CMD PARSED"));
+      #endif
 
       sprintf(cmdBuffer,"%s%s$",HEADER,OKCMD);
 
-      debug(F("Sending OK CMD: ")); debugln(cmdBuffer);
+      #if DEBUGWATCHDOG
+      debug(F("Sending OK CMD: ")); debugln(cmdBuffer); debugln();
+      #endif
 
       rs485.print(cmdBuffer);
     }
-    else if(strcmp(cmdBuffer,pumpCMD)==0)
+    else
+    #endif
+    if(strcmp(cmdBuffer,pumpCMD)==0)
     {
       debugln(F("PUMP CMD PARSED"));
 
@@ -89,7 +83,7 @@ void handleRS485Event()
         pumpEnabled = true;
         digitalWrite(pumpRelayPin,RELAY_ENABLED);
 
-        debug(F("Starting pump at millis() = ")); debugln(pumpPMillis);
+        debug(F("Starting pump at millis() = ")); debugln(pumpPMillis); debugln();
       }
       else
       {
@@ -103,14 +97,14 @@ void handleRS485Event()
             debug(millis() - pumpPMillis);debug(F("ms)"));
           }
         #endif
-        debugln();
+        debugln('\n');
 
         pumpEnabled = false;
       }
       
       sprintf(cmdBuffer,"%s%s$",HEADER,OKCMD);
 
-      debug(F("Sending OK CMD: ")); debugln(cmdBuffer);
+      debug(F("Sending OK CMD: ")); debugln(cmdBuffer);  debugln();
 
       rs485.print(cmdBuffer);
     }
@@ -122,9 +116,13 @@ void handleRS485Event()
 
       sprintf(cmdBuffer,"%s%s$%d$",HEADER,tempCMD,temp);
 
-      debug(F("Sending TEMP CMD ANSWER: ")); debugln(cmdBuffer);
+      debug(F("Sending TEMP CMD ANSWER: ")); debugln(cmdBuffer); debugln();
 
       rs485.print(cmdBuffer);
+    }
+    else
+    {
+      debugln(F("WARNING: Unknown Command parsed"));
     }
     if(rs485.available())
     {
@@ -137,10 +135,96 @@ void handleRS485Event()
           rs485.read();
         #endif
       }
-      debug(F("\"\n"));
+      debug(F("\"\n\n"));
     }
   }
 }
+
+
+void waitForValveConnection()
+{
+  #if !DISABLE_WATCHDOGS
+
+  char cmdBuffer[17];
+  unsigned long connectionPMillis = millis();
+  bool connected = false;
+
+  debugln(F("Waiting for connection from valve MCU..."));
+
+  while(!connected && millis() - connectionPMillis < initConnectionTimeout)
+  {
+    wdt_reset();
+    delay(20);
+    if(rs485.available() && rs485.find(HEADER))
+    {
+      size_t dataSize = rs485.readBytesUntil('$', cmdBuffer, 16);
+      cmdBuffer[dataSize] = '\0';
+      //debug(F("Command:\t")); debugln(cmdBuffer);
+
+      if(strcmp(cmdBuffer,WTDRSTCMD) == 0)
+      {
+        #if DEBUGWATCHDOG
+        debugln(F("Watchdog Reset CMD PARSED"));
+        #endif
+
+        connected = true;
+
+        sprintf(cmdBuffer,"%s%s$",HEADER,OKCMD);
+
+        #if DEBUGWATCHDOG
+        debug(F("Sending OK CMD: ")); debugln(cmdBuffer);
+        #endif
+
+        rs485.print(cmdBuffer);
+      }
+    }
+  }
+
+  if(!connected)
+  {
+    Serial.println(F("\n-----------------------------------------"));
+    Serial.println(F("-----------------------------------------"));
+    Serial.println(F("ERROR: Cannot connect to valve MCU"));
+    Serial.println(F("-----------------------------------------"));
+    Serial.println(F("-----------------------------------------\n"));
+
+    Serial.print(F("Rebooting"));
+    rebootLoop();
+  }
+  debugln(F("Connected to valve MCU!!!"));
+  delay(1500);
+
+  #endif
+}
+
+
+void setup() 
+{
+  wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
+  #if !DISABLE_WATCHDOGS
+    delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+  #endif
+
+  pinMode(pumpRelayPin,OUTPUT);
+  digitalWrite(pumpRelayPin,RELAY_DISABLED);
+  Serial.begin(9600); // Used for debug purposes
+  delay(3000);
+  Serial.println(F("\n------------------------------------------"));
+  Serial.println(F(  "|                SHWRS-HS                |"));
+  Serial.println(F(  "------------------------------------------\n"));
+
+  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+
+  delay(1000);
+
+  waitForValveConnection();
+
+  Serial.println(F("Heater side system successfully started!!!"));
+
+  delay(1000);
+}
+
 
 void loop() 
 { 

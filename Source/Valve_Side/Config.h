@@ -1,11 +1,19 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define DEBUG 1
+#define DEBUG 0
+#define DEBUGWATCHDOG 0
+#define DISABLE_WATCHDOGS 0
+
+#define ERROR_REGISTER_ADDRESS 0
+#define EEPROM_SIZE 1024
+#define EEPROM_ERROR_MAGIC_STR "MES"
+#define EEPROM_DONT_WRITE 1
 
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED
 
+const long initConnectionTimeout = 120000; // 2 min
 const int watchdogResetPeriod = 6000; // 7.5 s
 const int receivedMessageTimeout = 100; // 100 ms
 const long autoDisablePumpTimeout = 120000; // 2 min
@@ -25,6 +33,7 @@ const char tempCMD[] = "TEMP";
 const char OKCMD[] = "OK";
 const char WTDRSTCMD[] = "WTD_RST";
 
+
 #if DEBUG
   #define debug(...) do {Serial.print(__VA_ARGS__); Serial.flush();} while(0)
   #define debugln(...) do {Serial.println(__VA_ARGS__); Serial.flush();} while(0)
@@ -32,5 +41,20 @@ const char WTDRSTCMD[] = "WTD_RST";
   #define debug(...) 
   #define debugln(...) 
 #endif
+
+
+void rebootLoop()
+{
+  #if DISABLE_WATCHDOGS
+    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+  #endif
+
+  while (1) 
+  {
+    Serial.print('.');
+    delay(500);
+  }
+}
+
 
 #endif
