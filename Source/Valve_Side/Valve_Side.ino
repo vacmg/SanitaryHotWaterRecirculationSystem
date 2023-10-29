@@ -232,6 +232,10 @@ void serialEvent()
     Serial.print(F("Error Register Invalidated\nRebooting"));
     rebootLoop();
   }
+  else if(strcmp(buffer,"errorlist") == 0)
+  {
+    printErrorData(errorData,true);
+  }
   else if(strcmp(buffer,"e") == 0)
   {
     Serial.println(F("Enabling trigger"));
@@ -248,7 +252,7 @@ void serialEvent()
     Serial.print(F("Setting valve temp to: ")); Serial.println(valveTemp);
   }
 
-  Serial.println(F("\nType 'clear' to invalidate the Error Register.\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
 }
 
 #if !DISABLE_WATCHDOGS
@@ -389,7 +393,7 @@ void setup()
 
   Serial.println(F("Valve side system successfully started!!!"));
 
-  Serial.println(F("\nType 'clear' to invalidate the Error Register.\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
   
   delay(1000);
 }
