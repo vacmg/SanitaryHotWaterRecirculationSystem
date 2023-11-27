@@ -16,7 +16,7 @@ const char pumpCMD[] = "PUMP";
 const char tempCMD[] = "TEMP";
 const char OKCMD[] = "OK";
 
-const int receivedMessageTimeout = 100; //ms
+const int RECEIVED_MESSAGE_TIMEOUT = 100; //ms
 
 MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module constructor
 
@@ -26,7 +26,7 @@ void setup()
   Serial.setTimeout(100);
   delay(1000);
 
-  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+  rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
@@ -67,7 +67,7 @@ void serialEvent()
     Serial.print(F("\"\n"));
   }
 
-  delay(2*receivedMessageTimeout);
+  delay(2*RECEIVED_MESSAGE_TIMEOUT);
 
   if(rs485.available())
   {

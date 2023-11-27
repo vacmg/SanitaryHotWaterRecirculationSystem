@@ -5,17 +5,30 @@
 #include<avr/wdt.h> /* Header for watchdog timers in AVR */
 #include <EEPROM.h>
 #include <MAX_RS485.h>
+#include <OneWire.h>                
+#include <DallasTemperature.h>
 #include "Config.h"
 
-const uint8_t receiverEnablePin =  5;  // HIGH = Driver / LOW = Receptor
-const uint8_t driveEnablePin =  4;  // HIGH = Driver / LOW = Receptor
-const uint8_t rxPin = 6; // Serial data in pin
-const uint8_t txPin = 3; // Serial data out pin
+const uint8_t RECEIVER_ENABLE_PIN =  5;  // HIGH = Driver / LOW = Receptor
+const uint8_t DRIVE_ENABLE_PIN =  4;  // HIGH = Driver / LOW = Receptor
+const uint8_t RX_PIN = 6; // Serial data in pin
+const uint8_t TX_PIN = 3; // Serial data out pin
 
 #warning Change this pin to an actual relay
-const uint8_t valveRelayPin = 13;
+const uint8_t VALVE_RELAY_PIN = 13;
 
-MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module constructor
+#if !MOCK_SENSORS
+const uint8_t PRESSURE_SENSOR = A0;
+
+const uint8_t TEMP_SENSOR = 12;
+
+
+OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
+DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
+#endif
+
+MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Create rs485 instance
+
 
 typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
@@ -42,9 +55,19 @@ Status status = WaitingCold;
 
 ErrorData errorData;
 
-bool triggerVal = false; // TODO remove this
-int valveTemp = 0; // TODO remove this
+#if MOCK_SENSORS
+bool triggerVal = false;
+#endif
 
+int valveTemp = 0;
+
+static char errorStrBuff[32];
+
+
+double fmap(double x, double in_min, double in_max, double out_min, double out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
 
 const char* getErrorName(ErrorCode error) 
@@ -60,7 +83,8 @@ const char* getErrorName(ErrorCode error)
     case ERROR_CONNECTION_NOT_ESTABLISHED:
       return "ERROR_CONNECTION_NOT_ESTABLISHED";
     default:
-      return "Unknown Error";
+      sprintf(errorStrBuff,"Unknown Error (%d)",error);
+      return errorStrBuff;
   }
 }
 
@@ -140,11 +164,17 @@ const char* statusToString(Status status)
 
 bool getValveTempIfNecessary()
 {
-  if(millis() - valveTempPMillis > valveTempGatheringPeriod) // each sec update valve temp & compare 
+  if(millis() - valveTempPMillis > VALVE_TEMP_GATHERING_PERIOD) // each sec update valve temp & compare
   {
-    #warning TODO valve temp sensor reading
     debug(F("Current valve temp:\t"));
-    valveTemp = valveTemp; // TODO
+
+    #if MOCK_SENSORS
+      valveTemp = valveTemp; // TODO
+    #else
+      tempSensor.requestTemperatures(); // Request temp
+      valveTemp = tempSensor.getTempCByIndex(0); // Obtain temp
+    #endif
+    
     debug(valveTemp); debug(F("\tDesired temp:\t"));debugln(desiredTemp);
 
     valveTempPMillis = millis();
@@ -157,13 +187,13 @@ bool getValveTempIfNecessary()
 bool getHeaterTempIfNecessary()
 {
   char buffer[17];
-  if(millis() - heaterTempPMillis > heaterTempGatheringPeriod) // each 10 secs update heater temp
+  if(millis() - heaterTempPMillis > HEATER_TEMP_GATHERING_PERIOD) // each 10 secs update heater temp
   {
     sprintf(buffer,"%s%s$",HEADER,tempCMD);
     rs485.print(buffer);
     debugln(F("HEATER TEMP REQUEST CMD SENT"));
 
-    delay(tempMessageProcessingMultiplier*receivedMessageTimeout);
+    delay(TEMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
     if(rs485.available() && rs485.find(HEADER))
     {
@@ -183,11 +213,11 @@ bool getHeaterTempIfNecessary()
 
         if(status == ServingWater)
         {
-          desiredTemp = round(heaterTemp*pipeHeatTransportEfficiency*coldWaterTemperatureMultiplier);
+          desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
         }
         else
         {
-          desiredTemp = round(heaterTemp*pipeHeatTransportEfficiency);
+          desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
         }
         
         debug(F(" to ")); debugln(desiredTemp);
@@ -210,13 +240,24 @@ bool getHeaterTempIfNecessary()
   return false;
 }
 
-#warning Implement real trigger code
+
 bool isTriggerActive()
 {
+  #if !MOCK_SENSORS
+  int adcData = analogRead(A0);
+
+  double pressureSensorVoltage = (adcData * 1.1)/1024;
+  double pressureSensorCurrent = (pressureSensorVoltage*1000) / 51;
+
+  double pressure = fmap(pressureSensorCurrent, PRESSURE_SENSOR_CURRENT_MIN_mA, PRESSURE_SENSOR_CURRENT_MAX_mA, PRESSURE_SENSOR_MIN_BAR, PRESSURE_SENSOR_MAX_BAR);
+  return pressure < WATER_MIN_NORMAL_PRESSURE_BAR;
+
+  #else
   return triggerVal;
+  #endif
 }
 
-#warning Remove this debug interface
+
 void serialEvent()
 {
   char buffer[17];
@@ -236,6 +277,8 @@ void serialEvent()
   {
     printErrorData(errorData,true);
   }
+
+  #if MOCK_SENSORS
   else if(strcmp(buffer,"e") == 0)
   {
     Serial.println(F("Enabling trigger"));
@@ -251,15 +294,20 @@ void serialEvent()
     valveTemp = atoi(buffer);
     Serial.print(F("Setting valve temp to: ")); Serial.println(valveTemp);
   }
+  #endif
 
+  #if MOCK_SENSORS
   Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+  #else
+  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+  #endif
 }
 
 #if !DISABLE_WATCHDOGS
 void resetWatchdogs()
 {
   char buffer[17];
-  if(millis() - watchdogsPMillis > watchdogResetPeriod) // Reset both watchdogs once in a watchdogResetPeriod
+  if(millis() - watchdogsPMillis > WATCHDOG_RESET_PERIOD) // Reset both watchdogs once in a WATCHDOG_RESET_PERIOD
   {
     wdt_reset();
     watchdogsPMillis = millis();
@@ -272,7 +320,7 @@ void resetWatchdogs()
 
     rs485.print(buffer);
 
-    delay(wdtRstMessageProcessingMultiplier*receivedMessageTimeout);
+    delay(WDT_RST_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
     if(rs485.available() && rs485.find(HEADER))
     {
@@ -311,9 +359,9 @@ void connectToHeater()
 
   debugln(F("Connecting to heater MCU..."));
 
-  while(!connected && millis() - connectionPMillis < initConnectionTimeout)
+  while(!connected && millis() - connectionPMillis < INIT_CONNECTION_TIMEOUT)
   {
-    if(millis() - watchdogsPMillis > watchdogResetPeriod) // Reset both watchdogs once in a watchdogResetPeriod
+    if(millis() - watchdogsPMillis > WATCHDOG_RESET_PERIOD) // Reset both watchdogs once in a WATCHDOG_RESET_PERIOD
     {
       wdt_reset();
       watchdogsPMillis = millis();
@@ -326,7 +374,7 @@ void connectToHeater()
 
       rs485.print(buffer);
 
-      delay(wdtRstMessageProcessingMultiplier*receivedMessageTimeout);
+      delay(WDT_RST_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
       if(rs485.available() && rs485.find(HEADER))
       {
@@ -374,8 +422,8 @@ void setup()
     wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
   #endif
 
-  pinMode(valveRelayPin,OUTPUT);
-  digitalWrite(valveRelayPin,RELAY_DISABLED); // TODO check valve feedback pin
+  pinMode(VALVE_RELAY_PIN,OUTPUT);
+  digitalWrite(VALVE_RELAY_PIN,RELAY_DISABLED); // TODO check valve feedback pin
 
   Serial.begin(9600); // Used for debug purposes
   delay(3000);
@@ -385,7 +433,12 @@ void setup()
 
   loadErrorRegister();
 
-  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+  #if !MOCK_SENSORS
+    analogReference(INTERNAL);
+    tempSensor.begin();
+  #endif
+
+  rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
 
   delay(1000);
 
@@ -393,8 +446,13 @@ void setup()
 
   Serial.println(F("Valve side system successfully started!!!"));
 
+  #if MOCK_SENSORS
+  Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
   Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
-  
+  #else
+  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+  #endif
+    
   delay(1000);
 }
 
@@ -411,7 +469,7 @@ void loop()
         sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
         rs485.print(buffer);
         debugln(F("PUMP ON CMD SENT"));
-        delay(pumpMessageProcessingMultiplier*receivedMessageTimeout);
+        delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
         if(rs485.available() && rs485.find(HEADER))
         {
@@ -450,7 +508,7 @@ void loop()
         sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
         rs485.print(buffer);
         debugln(F("PUMP OFF CMD SENT"));
-        delay(pumpMessageProcessingMultiplier*receivedMessageTimeout);
+        delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
         if(rs485.available() && rs485.find(HEADER))
         {
@@ -477,7 +535,7 @@ void loop()
           error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
         }
 
-        digitalWrite(valveRelayPin, RELAY_ENABLED);
+        digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
         changeStatus(ServingWater);
       }
 
@@ -489,7 +547,7 @@ void loop()
 
       if(getValveTempIfNecessary() && !isTriggerActive() && valveTemp < desiredTemp)
       {
-        digitalWrite(valveRelayPin, RELAY_DISABLED);
+        digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
         changeStatus(WaitingCold);
       }
 

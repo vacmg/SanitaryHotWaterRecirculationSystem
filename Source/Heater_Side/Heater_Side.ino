@@ -21,24 +21,25 @@ bool pumpEnabled = false;
 unsigned long pumpPMillis = 0;
 
 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float getTemp()
 {
   #warning Implement DS18B20 logic
-  return 63.38; // TODO implement DS18B20 logic
+  return 63.38; // TODO implement DS18B20 logic //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 void autoDisablePumpIfTimeout()
 {
-  if(pumpEnabled && millis() - pumpPMillis > autoDisablePumpTimeout)
+  if(pumpEnabled && millis() - pumpPMillis > AUTO_DISABLE_PUMP_TIMEOUT)
   {
     pumpEnabled = false;
     digitalWrite(pumpRelayPin,RELAY_DISABLED);
 
     debug(F("ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = "));
     debug(millis() - pumpPMillis); debug(F("ms > Timeout = "));
-    debug(autoDisablePumpTimeout);debugln(F("ms)\nDISCONECTING IT..."));
+    debug(AUTO_DISABLE_PUMP_TIMEOUT);debugln(F("ms)\nDISCONECTING IT..."));
   }
 }
 
@@ -151,7 +152,7 @@ void waitForValveConnection()
 
   debugln(F("Waiting for connection from valve MCU..."));
 
-  while(!connected && millis() - connectionPMillis < initConnectionTimeout)
+  while(!connected && millis() - connectionPMillis < INIT_CONNECTION_TIMEOUT)
   {
     wdt_reset();
     delay(20);
@@ -214,7 +215,7 @@ void setup()
   Serial.println(F(  "|                SHWRS-HS                |"));
   Serial.println(F(  "------------------------------------------\n"));
 
-  rs485.begin(9600,receivedMessageTimeout); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+  rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
 
   delay(1000);
 
