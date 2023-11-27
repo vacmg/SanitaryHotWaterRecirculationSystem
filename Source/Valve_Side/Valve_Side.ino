@@ -9,13 +9,12 @@
 #include <DallasTemperature.h>
 #include "Config.h"
 
-const uint8_t RECEIVER_ENABLE_PIN =  5;  // HIGH = Driver / LOW = Receptor
-const uint8_t DRIVE_ENABLE_PIN =  4;  // HIGH = Driver / LOW = Receptor
-const uint8_t RX_PIN = 6; // Serial data in pin
-const uint8_t TX_PIN = 3; // Serial data out pin
+const uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
+const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
+const uint8_t RX_PIN = 11; // Serial data in pin
+const uint8_t TX_PIN = 8; // Serial data out pin
 
-#warning Change this pin to an actual relay
-const uint8_t VALVE_RELAY_PIN = 13;
+const uint8_t VALVE_RELAY_PIN = 2;
 
 #if !MOCK_SENSORS
 const uint8_t PRESSURE_SENSOR = A0;
@@ -447,10 +446,10 @@ void setup()
   Serial.println(F("Valve side system successfully started!!!"));
 
   #if MOCK_SENSORS
-  Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
+    Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
   #else
-  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+    Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
   #endif
     
   delay(1000);
