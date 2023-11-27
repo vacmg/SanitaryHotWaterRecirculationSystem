@@ -14,6 +14,14 @@ const uint8_t txPin = 3; // Serial data out pin
 #warning Change this pin to an actual relay
 const uint8_t pumpRelayPin = 13;
 
+#if !MOCK_SENSORS
+const uint8_t TEMP_SENSOR = 12;
+
+
+OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
+DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
+#endif
+
 MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module constructor
 
 char cmdBuffer[17] = "";
@@ -21,13 +29,15 @@ bool pumpEnabled = false;
 unsigned long pumpPMillis = 0;
 
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float getTemp()
 {
-  #warning Implement DS18B20 logic
-  return 63.38; // TODO implement DS18B20 logic //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  #if MOCK_SENSORS
+    return 63.38;
+  #else
+    tempSensor.requestTemperatures(); // Request temp
+    return tempSensor.getTempCByIndex(0); // Obtain temp
+  #endif
 }
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 void autoDisablePumpIfTimeout()
@@ -214,6 +224,10 @@ void setup()
   Serial.println(F("\n------------------------------------------"));
   Serial.println(F(  "|                SHWRS-HS                |"));
   Serial.println(F(  "------------------------------------------\n"));
+  
+  #if !MOCK_SENSORS
+    tempSensor.begin();
+  #endif
 
   rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
 
@@ -222,6 +236,10 @@ void setup()
   waitForValveConnection();
 
   Serial.println(F("Heater side system successfully started!!!"));
+  
+  #if MOCK_SENSORS
+    Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
+  #endif
 
   delay(1000);
 }
