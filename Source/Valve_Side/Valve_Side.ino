@@ -16,6 +16,8 @@ const uint8_t TX_PIN = 8; // Serial data out pin
 
 const uint8_t VALVE_RELAY_PIN = 2;
 
+bool SYSTEM_ENABLED = false;
+
 #if !MOCK_SENSORS
 const uint8_t PRESSURE_SENSOR = A0;
 
@@ -32,7 +34,7 @@ MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Creat
 typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
 
-typedef enum {NO_ERROR = 0, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,             ENUM_LEN} ErrorCode;
+typedef enum {NO_ERROR = 0, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
 #define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
 #define ERROR_MESSAGE_SIZE (EEPROM_SIZE-(sizeof(char)*4)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
 
@@ -118,11 +120,14 @@ void error(ErrorCode err, const char* message)
   Serial.println(F("-----------------------------------------"));
   Serial.println(F("-----------------------------------------\n"));
 
-  errorData.flags[err] = true;
-  strcpy(errorData.message[err],message);
-  #if !EEPROM_DONT_WRITE
-    EEPROM.put(ERROR_REGISTER_ADDRESS,errorData);
-  #endif
+  if(err != NO_ERROR)
+  {
+    errorData.flags[err] = true;
+    strcpy(errorData.message[err],message);
+    #if !EEPROM_DONT_WRITE
+      EEPROM.put(ERROR_REGISTER_ADDRESS,errorData);
+    #endif
+  }
 
   Serial.print(F("System is rebooting"));
   rebootLoop();
@@ -276,6 +281,16 @@ void serialEvent()
   {
     printErrorData(errorData,true);
   }
+  else if(strcmp(buffer,"enable") == 0)
+  {
+    EEPROM.put(ENABLE_REGISTER_ADDRESS, true);
+    error(NO_ERROR,"Rebooting to enable the system");
+  }
+  else if(strcmp(buffer,"disable") == 0)
+  {
+    EEPROM.put(ENABLE_REGISTER_ADDRESS, false);
+    error(NO_ERROR,"Rebooting to disable the system");
+  }
 
   #if MOCK_SENSORS
   else if(strcmp(buffer,"e") == 0)
@@ -296,9 +311,9 @@ void serialEvent()
   #endif
 
   #if MOCK_SENSORS
-  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
   #else
-  Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
   #endif
 }
 
@@ -339,7 +354,7 @@ void resetWatchdogs()
       }
       #endif
     }
-    else 
+    else if (SYSTEM_ENABLED)
     {
       error(ERROR_RS485_NO_RESPONSE,"Timeout receiving WTD_RST CMD ANSWER");
     }
@@ -426,30 +441,40 @@ void setup()
 
   Serial.begin(9600); // Used for debug purposes
   delay(3000);
-  Serial.println(F("\n------------------------------------------"));
-  Serial.println(F(  "|                SHWRS-VS                |"));
+  Serial.println(F("\n------------------------------------------"  ));
+  Serial.println(F(  "|                SHWRS-VS                |"  ));
   Serial.println(F(  "------------------------------------------\n"));
+  Serial.println(F(  "------------- SYSTEM ENABLED -------------"  ));
+  Serial.println(F(  "------------- SYSTEM DISABLED ------------"  ));
 
+  EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
   loadErrorRegister();
 
-  #if !MOCK_SENSORS
-    analogReference(INTERNAL);
-    tempSensor.begin();
-  #endif
+  if(!SYSTEM_ENABLED)
+  {
+    Serial.println(F(  "------------- SYSTEM DISABLED ------------"  ));
+  }
+  else
+  {
+    Serial.println(F(  "------------- SYSTEM ENABLED -------------"  ));
 
-  rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+    #if !MOCK_SENSORS
+      analogReference(INTERNAL);
+      tempSensor.begin();
+    #endif
 
-  delay(1000);
+    rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+    delay(1000);
+    connectToHeater();
 
-  connectToHeater();
-
-  Serial.println(F("Valve side system successfully started!!!"));
+    Serial.println(F("Valve side system successfully connected!!!"));
+  }
 
   #if MOCK_SENSORS
     Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-    Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
   #else
-    Serial.println(F("\nType 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
   #endif
     
   delay(1000);
@@ -458,100 +483,104 @@ void setup()
 
 void loop() 
 {
-  char buffer[17];
-  switch(status)
+  if(SYSTEM_ENABLED)
   {
-    case WaitingCold:
+    char buffer[17];
+    switch(status)
+    {
+      case WaitingCold:
 
-      if(isTriggerActive())
-      {
-        sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
-        rs485.print(buffer);
-        debugln(F("PUMP ON CMD SENT"));
-        delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-        if(rs485.available() && rs485.find(HEADER))
+        if(isTriggerActive())
         {
-          size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-          buffer[dataSize] = '\0';
+          sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
+          rs485.print(buffer);
+          debugln(F("PUMP ON CMD SENT"));
+          delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
-          if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
+          if(rs485.available() && rs485.find(HEADER))
           {
-            debugln(F("PUMP CMD RESULT: OK"));
+            size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+            buffer[dataSize] = '\0';
 
-            heaterTempPMillis = 0; // Set millis timers
-            valveTempPMillis = 0;
-            changeStatus(DrivingWater);
+            if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
+            {
+              debugln(F("PUMP CMD RESULT: OK"));
+
+              heaterTempPMillis = 0; // Set millis timers
+              valveTempPMillis = 0;
+              changeStatus(DrivingWater);
+            }
+            else 
+            {
+              char message[64];
+              sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+              error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+            }
           }
           else 
           {
-            char message[64];
-            sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
-            error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+            error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
           }
         }
-        else 
+
+      break;
+
+      case DrivingWater:
+
+        getHeaterTempIfNecessary();
+
+        if(getValveTempIfNecessary() && valveTemp >= desiredTemp) // compare temps & change phase
         {
-          error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
-        }
-      }
+          sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
+          rs485.print(buffer);
+          debugln(F("PUMP OFF CMD SENT"));
+          delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
-    break;
-
-    case DrivingWater:
-
-      getHeaterTempIfNecessary();
-
-      if(getValveTempIfNecessary() && valveTemp >= desiredTemp) // compare temps & change phase
-      {
-        sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
-        rs485.print(buffer);
-        debugln(F("PUMP OFF CMD SENT"));
-        delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-        if(rs485.available() && rs485.find(HEADER))
-        {
-          size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-          buffer[dataSize] = '\0';
-
-          if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
+          if(rs485.available() && rs485.find(HEADER))
           {
-            debugln(F("PUMP CMD RESULT: OK"));
+            size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+            buffer[dataSize] = '\0';
 
-            heaterTempPMillis = 0; // Set millis timers
-            valveTempPMillis = 0;
-            changeStatus(DrivingWater);
+            if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
+            {
+              debugln(F("PUMP CMD RESULT: OK"));
+
+              heaterTempPMillis = 0; // Set millis timers
+              valveTempPMillis = 0;
+              changeStatus(DrivingWater);
+            }
+            else 
+            {
+              char message[64];
+              sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+              error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+            }
           }
           else 
           {
-            char message[64];
-            sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
-            error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+            error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
           }
+
+          digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
+          changeStatus(ServingWater);
         }
-        else 
+
+      break;
+
+      case ServingWater:
+
+        getHeaterTempIfNecessary();
+
+        if(getValveTempIfNecessary() && !isTriggerActive() && valveTemp < desiredTemp)
         {
-          error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+          digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
+          changeStatus(WaitingCold);
         }
 
-        digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
-        changeStatus(ServingWater);
-      }
-
-    break;
-
-    case ServingWater:
-
-      getHeaterTempIfNecessary();
-
-      if(getValveTempIfNecessary() && !isTriggerActive() && valveTemp < desiredTemp)
-      {
-        digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
-        changeStatus(WaitingCold);
-      }
-
-    break;
+      break;
+    }
   }
+
   #if !DISABLE_WATCHDOGS
   resetWatchdogs();
   #endif
