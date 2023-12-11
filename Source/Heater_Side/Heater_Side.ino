@@ -2,9 +2,16 @@
  * This is the source code of the part of the system which is near to the heater source.
  */
 
+#include "Config.h"
 #include<avr/wdt.h> /* Header for watchdog timers in AVR */
 #include <MAX_RS485.h>
-#include "Config.h"
+
+#if !MOCK_SENSORS
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#endif
+
+
 
 const uint8_t receiverEnablePin =  5;  // HIGH = Driver / LOW = Receptor
 const uint8_t driveEnablePin =  4;  // HIGH = Driver / LOW = Receptor

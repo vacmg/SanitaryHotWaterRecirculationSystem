@@ -1,15 +1,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define DEBUG 1
+#define DEBUG 0
 #define DEBUGWATCHDOG 0
-#define DISABLE_WATCHDOGS 0
-#define MOCK_SENSORS 1
+#define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
+#define MOCK_SENSORS 0
 
 #define ERROR_REGISTER_ADDRESS 0
 #define EEPROM_USED_SIZE 256
 #define EEPROM_ERROR_MAGIC_STR "MES"
-#define EEPROM_DONT_WRITE 1
+#define EEPROM_DONT_WRITE 0
 
 #define ENABLE_REGISTER_ADDRESS ERROR_REGISTER_ADDRESS + 1 + sizeof(ErrorData)
 

@@ -2,12 +2,15 @@
  * This is the source code of the part of the system which is near to the return valve.
  */
 
+#include "Config.h"
 #include<avr/wdt.h> /* Header for watchdog timers in AVR */
 #include <EEPROM.h>
 #include <MAX_RS485.h>
-#include <OneWire.h>                
+
+#if !MOCK_SENSORS
+#include <OneWire.h>
 #include <DallasTemperature.h>
-#include "Config.h"
+#endif
 
 const uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
 const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
@@ -269,7 +272,7 @@ void serialEvent()
   size_t len = Serial.readBytesUntil('\n',buffer,16);
   buffer[len] = '\0';
 
-  Serial.print(F("The user input: ")); Serial.println(buffer);
+  Serial.print(F("User input: ")); Serial.println(buffer);
 
   if(strcmp(buffer,"clear") == 0)
   {
@@ -304,17 +307,19 @@ void serialEvent()
     Serial.println(F("Disabling trigger"));
     triggerVal = false;
   }
+  else if(strcmp(buffer,"help") == 0)
+  {
+    #if MOCK_SENSORS
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    #else
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+    #endif
+  }
   else
   {
     valveTemp = atoi(buffer);
     Serial.print(F("Setting valve temp to: ")); Serial.println(valveTemp);
   }
-  #endif
-
-  #if MOCK_SENSORS
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
-  #else
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
   #endif
 }
 
@@ -462,15 +467,15 @@ void setup()
     Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
   #endif
 
+  Serial.println(F("Starting..."));
+
   if(!SYSTEM_ENABLED)
   {
-    Serial.println(F(  "------------- SYSTEM DISABLED ------------\n"  ));
+    Serial.println(F("\n------------- SYSTEM DISABLED ------------\n"  ));
   }
   else
   {
-    Serial.println(F(  "------------- SYSTEM ENABLED -------------\n"  ));
-
-    Serial.println(F("Starting..."));
+    Serial.println(F("\n------------- SYSTEM ENABLED -------------\n"  ));
 
     #if !MOCK_SENSORS
       analogReference(INTERNAL);
@@ -485,7 +490,7 @@ void setup()
   }
 
   wdt_reset();
-  Serial.println(F("Calling loop()"));
+  Serial.println(F("Start completed"));
     
   delay(1000);
 }
