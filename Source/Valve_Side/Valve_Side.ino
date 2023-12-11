@@ -36,7 +36,7 @@ typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
 
 typedef enum {NO_ERROR = 0, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
 #define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
-#define ERROR_MESSAGE_SIZE (EEPROM_SIZE-(sizeof(char)*4)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
+#define ERROR_MESSAGE_SIZE (EEPROM_USED_SIZE-(sizeof(char)*4)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
 
 typedef struct 
 {
@@ -88,6 +88,7 @@ const char* getErrorName(ErrorCode error)
       return errorStrBuff;
   }
 }
+
 
 void printErrorData(ErrorData& data, bool printAll = false)
 {
@@ -375,6 +376,11 @@ void connectToHeater()
 
   while(!connected && millis() - connectionPMillis < INIT_CONNECTION_TIMEOUT)
   {
+    if(Serial.available())
+    {
+      serialEvent();
+    }
+
     if(millis() - watchdogsPMillis > WATCHDOG_RESET_PERIOD) // Reset both watchdogs once in a WATCHDOG_RESET_PERIOD
     {
       wdt_reset();
@@ -444,19 +450,27 @@ void setup()
   Serial.println(F("\n------------------------------------------"  ));
   Serial.println(F(  "|                SHWRS-VS                |"  ));
   Serial.println(F(  "------------------------------------------\n"));
-  Serial.println(F(  "------------- SYSTEM ENABLED -------------"  ));
-  Serial.println(F(  "------------- SYSTEM DISABLED ------------"  ));
+  wdt_reset();
 
   EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
   loadErrorRegister();
 
+  #if MOCK_SENSORS
+    Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+  #else
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+  #endif
+
   if(!SYSTEM_ENABLED)
   {
-    Serial.println(F(  "------------- SYSTEM DISABLED ------------"  ));
+    Serial.println(F(  "------------- SYSTEM DISABLED ------------\n"  ));
   }
   else
   {
-    Serial.println(F(  "------------- SYSTEM ENABLED -------------"  ));
+    Serial.println(F(  "------------- SYSTEM ENABLED -------------\n"  ));
+
+    Serial.println(F("Starting..."));
 
     #if !MOCK_SENSORS
       analogReference(INTERNAL);
@@ -470,12 +484,8 @@ void setup()
     Serial.println(F("Valve side system successfully connected!!!"));
   }
 
-  #if MOCK_SENSORS
-    Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
-  #else
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
-  #endif
+  wdt_reset();
+  Serial.println(F("Calling loop()"));
     
   delay(1000);
 }
