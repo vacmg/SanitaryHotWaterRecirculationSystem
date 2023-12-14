@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include<avr/wdt.h>
+
 #define DEBUG 0
 #define DEBUGWATCHDOG 0
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU

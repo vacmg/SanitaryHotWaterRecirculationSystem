@@ -11,15 +11,13 @@
 #include <DallasTemperature.h>
 #endif
 
-
-
-const uint8_t receiverEnablePin =  5;  // HIGH = Driver / LOW = Receptor
-const uint8_t driveEnablePin =  4;  // HIGH = Driver / LOW = Receptor
-const uint8_t rxPin = 6; // Serial data in pin
-const uint8_t txPin = 3; // Serial data out pin
+const uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
+const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
+const uint8_t RX_PIN = 11; // Serial data in pin
+const uint8_t TX_PIN = 8; // Serial data out pin
 
 #warning Change this pin to an actual relay
-const uint8_t pumpRelayPin = 13;
+const uint8_t pumpRelayPin = 7;
 
 #if !MOCK_SENSORS
 const uint8_t TEMP_SENSOR = 12;
@@ -29,7 +27,7 @@ OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
 DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 #endif
 
-MAX_RS485 rs485(rxPin, txPin, receiverEnablePin, driveEnablePin); // module constructor
+MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // module constructor
 
 char cmdBuffer[17] = "";
 bool pumpEnabled = false;
