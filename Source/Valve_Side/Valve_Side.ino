@@ -37,13 +37,13 @@ MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Creat
 typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
 
-typedef enum {NO_ERROR = 0, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
+typedef enum {NO_ERROR = 0, ERROR_INTERNAL, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
 #define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
 #define ERROR_MESSAGE_SIZE (EEPROM_USED_SIZE-(sizeof(char)*4)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
 
 typedef struct 
 {
-  char magic[4];
+  char magic[sizeof(EEPROM_ERROR_MAGIC_STR)];
   bool flags[NUM_OF_ERROR_TYPES];
   char message[NUM_OF_ERROR_TYPES][ERROR_MESSAGE_SIZE];
 } 
@@ -65,7 +65,7 @@ bool triggerVal = false;
 
 int valveTemp = 0;
 
-static char errorStrBuff[32];
+static char errorStrBuff[ERROR_MESSAGE_SIZE];
 
 
 double fmap(double x, double in_min, double in_max, double out_min, double out_max)
@@ -80,6 +80,12 @@ const char* getErrorName(ErrorCode error)
   {
     case NO_ERROR:
       return "NO_ERROR";
+    case ERROR_INTERNAL:
+      return "ERROR_INTERNAL";
+    case ERROR_TEMP_SENSOR_INVALID_VALUE:
+      return "ERROR_TEMP_SENSOR_INVALID_VALUE";
+    case ERROR_PRESSURE_SENSOR_INVALID_VALUE:
+      return "ERROR_PRESSURE_SENSOR_INVALID_VALUE";
     case ERROR_RS485_NO_RESPONSE:
       return "ERROR_RS485_NO_RESPONSE";
     case ERROR_RS485_UNEXPECTED_MESSAGE:
@@ -115,11 +121,11 @@ void printErrorData(ErrorData& data, bool printAll = false)
   Serial.println(F("-----------------------------------------\n"));;
 }
 
-void error(ErrorCode err, const char* message)
+void error(ErrorCode err, const char* message, bool printName)
 {
   Serial.println(F("\n-----------------------------------------"));
   Serial.println(F("-----------------------------------------"));
-  Serial.print(getErrorName(err)); Serial.print(F(":\n"));
+  Serial.print(F("ERROR ")); if(printName){Serial.print(getErrorName(err));} Serial.print(F(": (")); Serial.print(err); Serial.print(")\n");
   Serial.println(message);
   Serial.println(F("-----------------------------------------"));
   Serial.println(F("-----------------------------------------\n"));
@@ -133,8 +139,19 @@ void error(ErrorCode err, const char* message)
     #endif
   }
 
+  delay(5000);
+  if(Serial.available())
+  {
+    serialEvent();
+  }
+
   Serial.print(F("System is rebooting"));
   rebootLoop();
+}
+
+void error(ErrorCode err, const char* message)
+{
+  error(err, message, 1);
 }
 
 void loadErrorRegister()
@@ -169,6 +186,42 @@ const char* statusToString(Status status)
   }
 }
 
+#if !MOCK_SENSORS
+float getValveTemp()
+{
+  tempSensor.requestTemperatures(); // Request temp
+  float temp = tempSensor.getTempCByIndex(0); // Obtain temp
+  if(temp<MIN_ALLOWED_TEMP)
+  {
+    sprintf(errorStrBuff,"TEMP IS TOO LOW (%d)",(int)temp);
+    error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
+  }
+  else if(temp<MAX_ALLOWED_TEMP)
+  {
+    sprintf(errorStrBuff,"TEMP IS TOO HIGH (%d)",(int)temp);
+    error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
+  }
+  return temp;
+}
+
+double getValvePressure()
+{
+  int adcData = analogRead(A0);
+
+  double pressureSensorVoltage = (adcData * 1.1)/1024;
+  double pressureSensorCurrent = (pressureSensorVoltage*1000) / 51;
+
+  if(!(pressureSensorCurrent >= MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA && pressureSensorCurrent <= MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA))
+  {
+    sprintf(errorStrBuff,"PRESSURE CURRENT (%dmA) IS OUTSIDE THE RANGE (%d, %d)mA",(int)pressureSensorCurrent, (int)MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA, (int)MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA);
+    error(ERROR_PRESSURE_SENSOR_INVALID_VALUE,errorStrBuff);
+  }
+
+  return fmap(pressureSensorCurrent, PRESSURE_SENSOR_CURRENT_MIN_mA, PRESSURE_SENSOR_CURRENT_MAX_mA, PRESSURE_SENSOR_MIN_BAR, PRESSURE_SENSOR_MAX_BAR);
+}
+
+#endif
+
 
 bool getValveTempIfNecessary()
 {
@@ -176,11 +229,8 @@ bool getValveTempIfNecessary()
   {
     debug(F("Current valve temp:\t"));
 
-    #if MOCK_SENSORS
-      valveTemp = valveTemp; // TODO
-    #else
-      tempSensor.requestTemperatures(); // Request temp
-      valveTemp = tempSensor.getTempCByIndex(0); // Obtain temp
+    #if !MOCK_SENSORS
+      valveTemp = getValveTemp();
     #endif
     
     debug(valveTemp); debug(F("\tDesired temp:\t"));debugln(desiredTemp);
@@ -232,9 +282,8 @@ bool getHeaterTempIfNecessary()
       }
       else 
       {
-        char message[64];
-        sprintf(message,"Expected 'TEMP';\tReceived '%s'",buffer);
-        error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+        sprintf(errorStrBuff,"Expected 'TEMP';\tReceived '%s'",buffer);
+        error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
       }
     }
     else 
@@ -252,16 +301,10 @@ bool getHeaterTempIfNecessary()
 bool isTriggerActive()
 {
   #if !MOCK_SENSORS
-  int adcData = analogRead(A0);
-
-  double pressureSensorVoltage = (adcData * 1.1)/1024;
-  double pressureSensorCurrent = (pressureSensorVoltage*1000) / 51;
-
-  double pressure = fmap(pressureSensorCurrent, PRESSURE_SENSOR_CURRENT_MIN_mA, PRESSURE_SENSOR_CURRENT_MAX_mA, PRESSURE_SENSOR_MIN_BAR, PRESSURE_SENSOR_MAX_BAR);
-  return pressure < WATER_MIN_NORMAL_PRESSURE_BAR;
-
+    double pressure = getValvePressure();
+    return pressure < WATER_MIN_NORMAL_PRESSURE_BAR;
   #else
-  return triggerVal;
+    return triggerVal;
   #endif
 }
 
@@ -349,9 +392,8 @@ void resetWatchdogs()
 
       if(strcmp(buffer,OKCMD)!=0)
       {
-        char message[64];
-        sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
-        error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+        sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
+        error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
       }
       #if DEBUGWATCHDOG
       else 
@@ -439,6 +481,15 @@ void connectToHeater()
 }
 
 
+#if !MOCK_SENSORS
+void post()
+{
+  getValvePressure();
+  getValveTemp();
+}
+#endif
+
+
 void setup() 
 {
   wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
@@ -480,6 +531,8 @@ void setup()
     #if !MOCK_SENSORS
       analogReference(INTERNAL);
       tempSensor.begin();
+
+      post();
     #endif
 
     rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
@@ -566,9 +619,8 @@ void loop()
             }
             else 
             {
-              char message[64];
-              sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
-              error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+              sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
+              error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
             }
           }
           else 
