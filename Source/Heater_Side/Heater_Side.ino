@@ -16,7 +16,7 @@ const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
 const uint8_t RX_PIN = 11; // Serial data in pin
 const uint8_t TX_PIN = 8; // Serial data out pin
 
-#warning Change this pin to an actual relay
+#warning Change this pin to an actual relay?? // TODO check if it is already in the actual pin
 const uint8_t pumpRelayPin = 7;
 
 #if !MOCK_SENSORS
