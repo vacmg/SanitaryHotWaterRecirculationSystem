@@ -1,6 +1,10 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#if !(defined(__AVR_ATmega328P__) && defined(ARDUINO_AVR_UNO))
+  #error This sketch is only compatible with an Arduino UNO due to the watchdog timer used (8s). However, with some modifications to the timings in the program, it is possible to run it in other platforms.
+#endif
+
 #include<avr/wdt.h>
 
 #define DEBUG 0
