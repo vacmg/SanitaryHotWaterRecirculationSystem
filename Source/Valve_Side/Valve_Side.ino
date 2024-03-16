@@ -141,6 +141,68 @@ void printSensorsInfo()
 }
 
 
+void startPump()
+{
+  char buffer[17];
+  sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
+  rs485.print(buffer);
+  debugln(F("PUMP ON CMD SENT"));
+  delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+
+  if(rs485.available() && rs485.find(HEADER))
+  {
+    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+    buffer[dataSize] = '\0';
+
+    if(strcmp(buffer,OKCMD)==0)
+    {
+      debugln(F("PUMP CMD RESULT: OK"));
+    }
+    else 
+    {
+      char message[64];
+      sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+      error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+    }
+  }
+  else 
+  {
+    error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+  }
+}
+
+
+void stopPump()
+{
+  char buffer[17];
+  sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
+  rs485.print(buffer);
+  debugln(F("PUMP OFF CMD SENT"));
+  delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+
+  if(rs485.available() && rs485.find(HEADER))
+  {
+    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+    buffer[dataSize] = '\0';
+
+    if(strcmp(buffer,OKCMD)==0)
+    {
+      debugln(F("PUMP CMD RESULT: OK"));
+    }
+    else 
+    {
+      char message[64];
+      sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+      error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
+    }
+  }
+  else 
+  {
+    error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+  }
+}
+
+
 void error(ErrorCode err, const char* message, bool printName)
 {
   Serial.println(F("\n-----------------------------------------"));
@@ -169,10 +231,12 @@ void error(ErrorCode err, const char* message, bool printName)
   rebootLoop();
 }
 
+
 void error(ErrorCode err, const char* message)
 {
   error(err, message, 1);
 }
+
 
 void loadErrorRegister()
 {
@@ -346,9 +410,9 @@ void serialEvent()
   if(strcmp(buffer,"help") == 0)
   {
     #if MOCK_SENSORS
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
     #else
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value or 'errorlist' to print the error list\n"));
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\n"));
     #endif
   }
   else if(strcmp(buffer,"clear") == 0)
@@ -376,6 +440,15 @@ void serialEvent()
   {
     printSensorsInfo();
   }
+  else if(strcmp(buffer,"startpump") == 0)
+  {
+    startPump();
+  }
+  else if(strcmp(buffer,"stoppump") == 0)
+  {
+    stopPump();
+  }
+  
 
   #if MOCK_SENSORS
   else if(strcmp(buffer,"e") == 0)
@@ -543,9 +616,9 @@ void setup()
 
   #if MOCK_SENSORS
     Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
   #else
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\n"));
   #endif
 
   Serial.println(F("Starting..."));
