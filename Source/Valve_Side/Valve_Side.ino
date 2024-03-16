@@ -122,25 +122,6 @@ void printErrorData(ErrorData& data, bool printAll = false)
 }
 
 
-void printSensorsInfo()
-{
-  Serial.println(F("\n-----------------------------------------"  ));
-  Serial.println(F(  "Sensor list:\n"));
-  #if MOCK_SENSORS
-    Serial.println(F("Valve pressure sensor: MOCKED"));
-    Serial.print(F(  "Valve temperature sensor: MOCKED to")); Serial.print(valveTemp);Serial.println(F("ºC"));
-  #else
-    Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure());Serial.println(F("BAR"));
-    Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp());Serial.println(F("ºC"));
-  #endif
-  getHeaterTemp();
-  Serial.print(F(    "Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
-  Serial.print(F(    "Desired temperature: ")); Serial.print(desiredTemp);Serial.println(F("ºC"));
-  
-  Serial.println(F(  "-----------------------------------------\n"));;
-}
-
-
 void startPump()
 {
   char buffer[17];
@@ -326,12 +307,16 @@ bool getValveTempIfNecessary()
 }
 
 
-void getHeaterTemp()
+void getHeaterTemp(bool messages = true)
 {
   char buffer[17];
   sprintf(buffer,"%s%s$",HEADER,tempCMD);
   rs485.print(buffer);
-  debugln(F("HEATER TEMP REQUEST CMD SENT"));
+  if(messages)
+  {
+    debugln(F("HEATER TEMP REQUEST CMD SENT"));
+  }
+  
 
   delay(TEMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
@@ -344,13 +329,17 @@ void getHeaterTemp()
     {
       size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
       buffer[dataSize] = '\0';
-      
-      debug(F("Heater Temp updated from ")); debug(heaterTemp);
+      if(messages)
+      {
+        debug(F("Heater Temp updated from ")); debug(heaterTemp);
+      }
       heaterTemp = atoi(buffer);
-      debug(F(" to ")); debugln(heaterTemp);
-
-      debug(F("Desired Temp updated from ")); debug(desiredTemp);
-
+      if(messages)
+      {
+        debug(F(" to ")); debugln(heaterTemp);
+        debug(F("Desired Temp updated from ")); debug(desiredTemp);
+      }
+      
       if(status == ServingWater)
       {
         desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
@@ -360,7 +349,10 @@ void getHeaterTemp()
         desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
       }
       
-      debug(F(" to ")); debugln(desiredTemp);
+      if(messages)
+      {
+        debug(F(" to ")); debugln(desiredTemp);
+      }
     }
     else 
     {
@@ -396,6 +388,25 @@ bool isTriggerActive()
   #else
     return triggerVal;
   #endif
+}
+
+
+void printSensorsInfo()
+{
+  Serial.println(F("\n-----------------------------------------"  ));
+  Serial.println(F(  "Sensor list:\n"));
+  #if MOCK_SENSORS
+    Serial.println(F("Valve pressure sensor: MOCKED"));
+    Serial.print(F(  "Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp);Serial.println(F("ºC"));
+  #else
+    Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure());Serial.println(F("BAR"));
+    Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp());Serial.println(F("ºC"));
+  #endif
+  getHeaterTemp(false);
+  Serial.print(F(    "Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
+  Serial.print(F(    "Desired temperature: ")); Serial.print(desiredTemp);Serial.println(F("ºC"));
+  
+  Serial.println(F(  "-----------------------------------------\n"));;
 }
 
 
