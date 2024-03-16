@@ -261,7 +261,7 @@ float getValveTemp()
     sprintf(errorStrBuff,"TEMP IS TOO LOW (%d)",(int)temp);
     error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
   }
-  else if(temp<MAX_ALLOWED_TEMP)
+  else if(temp>MAX_ALLOWED_TEMP)
   {
     sprintf(errorStrBuff,"TEMP IS TOO HIGH (%d)",(int)temp);
     error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
