@@ -307,12 +307,12 @@ bool getValveTempIfNecessary()
 }
 
 
-void getHeaterTemp(bool messages = true)
+void getHeaterTemp(bool ignoreErrors = false)
 {
   char buffer[17];
   sprintf(buffer,"%s%s$",HEADER,tempCMD);
   rs485.print(buffer);
-  if(messages)
+  if(!ignoreErrors)
   {
     debugln(F("HEATER TEMP REQUEST CMD SENT"));
   }
@@ -329,12 +329,12 @@ void getHeaterTemp(bool messages = true)
     {
       size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
       buffer[dataSize] = '\0';
-      if(messages)
+      if(!ignoreErrors)
       {
         debug(F("Heater Temp updated from ")); debug(heaterTemp);
       }
       heaterTemp = atoi(buffer);
-      if(messages)
+      if(!ignoreErrors)
       {
         debug(F(" to ")); debugln(heaterTemp);
         debug(F("Desired Temp updated from ")); debug(desiredTemp);
@@ -349,20 +349,26 @@ void getHeaterTemp(bool messages = true)
         desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
       }
       
-      if(messages)
+      if(!ignoreErrors)
       {
         debug(F(" to ")); debugln(desiredTemp);
       }
     }
     else 
     {
-      sprintf(errorStrBuff,"Expected 'TEMP';\tReceived '%s'",buffer);
-      error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+      if(!ignoreErrors)
+      {
+        sprintf(errorStrBuff,"Expected 'TEMP';\tReceived '%s'",buffer);
+        error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+      }
     }
   }
   else 
   {
-    error(ERROR_RS485_NO_RESPONSE,"Timeout receiving TEMP CMD ANSWER");
+    if(!ignoreErrors)
+    {
+      error(ERROR_RS485_NO_RESPONSE,"Timeout receiving TEMP CMD ANSWER");
+    }
   }
 }
 
@@ -402,7 +408,7 @@ void printSensorsInfo()
     Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure());Serial.println(F("BAR"));
     Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp());Serial.println(F("ºC"));
   #endif
-  getHeaterTemp(false);
+  getHeaterTemp(true);
   Serial.print(F(    "Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
   Serial.print(F(    "Desired temperature: ")); Serial.print(desiredTemp);Serial.println(F("ºC"));
   
@@ -533,9 +539,9 @@ void connectToHeater(bool ignoreErrors = false)
   unsigned long connectionPMillis = millis();
   bool connected = false;
 
-  debugln(F("Connecting to heater MCU..."));
+  debug(F("Connecting to heater MCU... Max time: ")); debug(SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED); debugln(F("ms"));
 
-  while(!connected && millis() - connectionPMillis < INIT_CONNECTION_TIMEOUT)
+  while(!connected && (millis() - connectionPMillis) < (SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED))
   {
     if(Serial.available())
     {
@@ -584,11 +590,23 @@ void connectToHeater(bool ignoreErrors = false)
       #endif
     }
   }
-  if(!connected && !ignoreErrors)
+
+  if(!connected)
   {
-    error(ERROR_CONNECTION_NOT_ESTABLISHED,"ERROR: Cannot connect to heater MCU");
+    if(ignoreErrors)
+    {
+      debugln(F("Cannot connect to heater MCU"));
+    }
+    else
+    {
+      error(ERROR_CONNECTION_NOT_ESTABLISHED,"ERROR: Cannot connect to heater MCU");
+    }
   }
-  debugln(F("Connected to heater MCU!!!"));
+  else
+  {
+    debugln(F("Connected to heater MCU!!!"));
+  }
+
   delay(1500);
 
   #endif
@@ -625,14 +643,10 @@ void setup()
   EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
   loadErrorRegister();
 
-  #if MOCK_SENSORS
-    Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
-  #else
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\n"));
-  #endif
-
   Serial.println(F("Starting..."));
+
+  rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+  delay(1000);
 
   if(!SYSTEM_ENABLED)
   {
@@ -651,14 +665,21 @@ void setup()
       post();
     #endif
 
-    rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
-    delay(1000);
-
     connectToHeater();
   }
 
   wdt_reset();
   Serial.println(F("Start completed"));
+
+  delay(500);
+  printSensorsInfo();
+
+  #if MOCK_SENSORS
+    Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+  #else
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\n"));
+  #endif
     
   delay(1000);
 }
