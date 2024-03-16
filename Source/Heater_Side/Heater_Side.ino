@@ -108,7 +108,7 @@ void handleRS485Event()
           if(pumpEnabled)
           {
             debug(F("Elapsed time = "));
-            debug(millis() - pumpPMillis);debug(F("ms)"));
+            debug(millis() - pumpPMillis);debug(F("ms"));
           }
         #endif
         debugln('\n');
