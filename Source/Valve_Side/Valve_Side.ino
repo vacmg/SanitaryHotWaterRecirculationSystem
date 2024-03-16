@@ -121,6 +121,26 @@ void printErrorData(ErrorData& data, bool printAll = false)
   Serial.println(F("-----------------------------------------\n"));;
 }
 
+
+void printSensorsInfo()
+{
+  Serial.println(F("\n-----------------------------------------"  ));
+  Serial.println(F(  "Sensor list:\n"));
+  #if MOCK_SENSORS
+    Serial.println(F("Valve pressure sensor: MOCKED"));
+    Serial.print(F(  "Valve temperature sensor: MOCKED to")); Serial.print(valveTemp);Serial.println(F("ºC"));
+  #else
+    Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure());Serial.println(F("BAR"));
+    Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp());Serial.println(F("ºC"));
+  #endif
+  getHeaterTemp();
+  Serial.print(F(    "Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
+  Serial.print(F(    "Desired temperature: ")); Serial.print(desiredTemp);Serial.println(F("ºC"));
+  
+  Serial.println(F(  "-----------------------------------------\n"));;
+}
+
+
 void error(ErrorCode err, const char* message, bool printName)
 {
   Serial.println(F("\n-----------------------------------------"));
@@ -242,54 +262,60 @@ bool getValveTempIfNecessary()
 }
 
 
-bool getHeaterTempIfNecessary()
+void getHeaterTemp()
 {
   char buffer[17];
-  if(millis() - heaterTempPMillis > HEATER_TEMP_GATHERING_PERIOD) // each 10 secs update heater temp
+  sprintf(buffer,"%s%s$",HEADER,tempCMD);
+  rs485.print(buffer);
+  debugln(F("HEATER TEMP REQUEST CMD SENT"));
+
+  delay(TEMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+
+  if(rs485.available() && rs485.find(HEADER))
   {
-    sprintf(buffer,"%s%s$",HEADER,tempCMD);
-    rs485.print(buffer);
-    debugln(F("HEATER TEMP REQUEST CMD SENT"));
+    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+    buffer[dataSize] = '\0';
 
-    delay(TEMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-    if(rs485.available() && rs485.find(HEADER))
+    if(strcmp(buffer, tempCMD) == 0)
     {
       size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
       buffer[dataSize] = '\0';
+      
+      debug(F("Heater Temp updated from ")); debug(heaterTemp);
+      heaterTemp = atoi(buffer);
+      debug(F(" to ")); debugln(heaterTemp);
 
-      if(strcmp(buffer, tempCMD) == 0)
+      debug(F("Desired Temp updated from ")); debug(desiredTemp);
+
+      if(status == ServingWater)
       {
-        size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-        buffer[dataSize] = '\0';
-        
-        debug(F("Heater Temp updated from ")); debug(heaterTemp);
-        heaterTemp = atoi(buffer);
-        debug(F(" to ")); debugln(heaterTemp);
-
-        debug(F("Desired Temp updated from ")); debug(desiredTemp);
-
-        if(status == ServingWater)
-        {
-          desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
-        }
-        else
-        {
-          desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
-        }
-        
-        debug(F(" to ")); debugln(desiredTemp);
+        desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
       }
-      else 
+      else
       {
-        sprintf(errorStrBuff,"Expected 'TEMP';\tReceived '%s'",buffer);
-        error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+        desiredTemp = round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
       }
+      
+      debug(F(" to ")); debugln(desiredTemp);
     }
     else 
     {
-      error(ERROR_RS485_NO_RESPONSE,"Timeout receiving TEMP CMD ANSWER");
+      sprintf(errorStrBuff,"Expected 'TEMP';\tReceived '%s'",buffer);
+      error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
     }
+  }
+  else 
+  {
+    error(ERROR_RS485_NO_RESPONSE,"Timeout receiving TEMP CMD ANSWER");
+  }
+}
+
+
+bool getHeaterTempIfNecessary()
+{
+  if(millis() - heaterTempPMillis > HEATER_TEMP_GATHERING_PERIOD) // each 10 secs update heater temp
+  {
+    getHeaterTemp();
 
     heaterTempPMillis = millis();
     return true;
@@ -317,7 +343,15 @@ void serialEvent()
 
   Serial.print(F("User input: ")); Serial.println(buffer);
 
-  if(strcmp(buffer,"clear") == 0)
+  if(strcmp(buffer,"help") == 0)
+  {
+    #if MOCK_SENSORS
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    #else
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value or 'errorlist' to print the error list\n"));
+    #endif
+  }
+  else if(strcmp(buffer,"clear") == 0)
   {
     errorData.magic[0]++;
     EEPROM.put(ERROR_REGISTER_ADDRESS, errorData);
@@ -338,6 +372,10 @@ void serialEvent()
     EEPROM.put(ENABLE_REGISTER_ADDRESS, false);
     error(NO_ERROR,"Rebooting to disable the system");
   }
+  else if(strcmp(buffer,"sensors") == 0)
+  {
+    printSensorsInfo();
+  }
 
   #if MOCK_SENSORS
   else if(strcmp(buffer,"e") == 0)
@@ -349,14 +387,6 @@ void serialEvent()
   {
     Serial.println(F("Disabling trigger"));
     triggerVal = false;
-  }
-  else if(strcmp(buffer,"help") == 0)
-  {
-    #if MOCK_SENSORS
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
-    #else
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register or errorlist to print the error list\n"));
-    #endif
   }
   else
   {
