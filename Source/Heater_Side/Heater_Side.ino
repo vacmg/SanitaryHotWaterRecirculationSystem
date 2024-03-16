@@ -53,6 +53,9 @@ void autoDisablePumpIfTimeout()
     debug(F("ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = "));
     debug(millis() - pumpPMillis); debug(F("ms > Timeout = "));
     debug(AUTO_DISABLE_PUMP_TIMEOUT);debugln(F("ms)\nDISCONECTING IT..."));
+
+    debugln(F("Rebooting both MCUs"));
+    rebootLoop();
   }
 }
 
@@ -97,7 +100,8 @@ void handleRS485Event()
         pumpEnabled = true;
         digitalWrite(pumpRelayPin,RELAY_ENABLED);
 
-        debug(F("Starting pump at millis() = ")); debugln(pumpPMillis); debugln();
+        debug(F("Starting pump at millis() = ")); debugln(pumpPMillis); 
+        debug(F("Max pump on time: ")); debug(AUTO_DISABLE_PUMP_TIMEOUT); debugln(F("ms\n"));
       }
       else
       {
