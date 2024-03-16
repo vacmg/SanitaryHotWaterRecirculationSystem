@@ -525,7 +525,7 @@ void resetWatchdogs()
 #endif
 
 
-void connectToHeater()
+void connectToHeater(bool ignoreErrors = false)
 {
   #if !DISABLE_WATCHDOGS
 
@@ -584,7 +584,7 @@ void connectToHeater()
       #endif
     }
   }
-  if(!connected)
+  if(!connected && !ignoreErrors)
   {
     error(ERROR_CONNECTION_NOT_ESTABLISHED,"ERROR: Cannot connect to heater MCU");
   }
@@ -637,6 +637,8 @@ void setup()
   if(!SYSTEM_ENABLED)
   {
     Serial.println(F("\n------------- SYSTEM DISABLED ------------\n"  ));
+
+    connectToHeater(true);
   }
   else
   {
@@ -651,9 +653,8 @@ void setup()
 
     rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
     delay(1000);
-    connectToHeater();
 
-    Serial.println(F("Valve side system successfully connected!!!"));
+    connectToHeater();
   }
 
   wdt_reset();
