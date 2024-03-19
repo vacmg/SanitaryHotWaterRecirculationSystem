@@ -539,9 +539,11 @@ void connectToHeater(bool ignoreErrors = false)
   unsigned long connectionPMillis = millis();
   bool connected = false;
 
-  debug(F("Connecting to heater MCU... Max time: ")); debug(SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED); debugln(F("ms"));
+  long timeout = (SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED);
 
-  while(!connected && (millis() - connectionPMillis) < (SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED))
+  debug(F("Connecting to heater MCU... Max time: ")); debug(timeout); debugln(F("ms"));
+
+  while(!connected && (millis() - connectionPMillis) < timeout)
   {
     if(Serial.available())
     {
