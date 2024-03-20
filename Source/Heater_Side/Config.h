@@ -24,8 +24,8 @@
 
 const float MIN_ALLOWED_TEMP = 0; // 0ºC
 const float MAX_ALLOWED_TEMP = 60; // 60ºc
-const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 3; // 3mA
-const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // 21mA
+const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 3; // mA
+const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
 const long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
 const long INIT_CONNECTION_TIMEOUT_IF_DISABLED = 12000; // 12 sec
@@ -34,14 +34,14 @@ const int RECEIVED_MESSAGE_TIMEOUT = 100; // 100 ms
 const long AUTO_DISABLE_PUMP_TIMEOUT = 120000; // 2 min
 const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 const int VALVE_TEMP_GATHERING_PERIOD = 1000; // 1 s
-const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.9; // 90% of the temperature at the heater should get into the valve
+const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve
 const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich the systems closes the valve is desiredTemp*COLD_WATER_TEMPERATURE_MULTIPLIER
 
 const double PRESSURE_SENSOR_MIN_BAR = 0.0;
 const double PRESSURE_SENSOR_MAX_BAR = 10.0;
-const double WATER_MIN_NORMAL_PRESSURE_BAR = 5.0;
-const double PRESSURE_SENSOR_CURRENT_MIN_mA = 4.0;
-const double PRESSURE_SENSOR_CURRENT_MAX_mA = 20.0;
+const double WATER_MIN_NORMAL_PRESSURE_BAR = 3.0;
+const double PRESSURE_SENSOR_CURRENT_MIN_mA = 3.6;
+const double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
 
 const int PUMP_MESSAGE_PROCESSING_MULTIPLIER = 2;
 const int TEMP_MESSAGE_PROCESSING_MULTIPLIER = 10;

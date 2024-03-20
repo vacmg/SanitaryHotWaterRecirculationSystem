@@ -34,7 +34,7 @@ const int RECEIVED_MESSAGE_TIMEOUT = 100; // 100 ms
 const long AUTO_DISABLE_PUMP_TIMEOUT = 120000; // 2 min
 const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 const int VALVE_TEMP_GATHERING_PERIOD = 1000; // 1 s
-const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 70% of the temperature at the heater should get into the valve
+const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve
 const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich the systems closes the valve is desiredTemp*COLD_WATER_TEMPERATURE_MULTIPLIER
 
 const double PRESSURE_SENSOR_MIN_BAR = 0.0;
