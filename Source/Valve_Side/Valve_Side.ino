@@ -658,6 +658,13 @@ void setup()
   rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
   delay(1000);
 
+  #if !MOCK_SENSORS
+    analogReference(INTERNAL);
+    tempSensor.begin();
+
+    post();
+  #endif
+
   if(!SYSTEM_ENABLED)
   {
     Serial.println(F("\n------------- SYSTEM DISABLED ------------\n"  ));
@@ -667,14 +674,6 @@ void setup()
   else
   {
     Serial.println(F("\n------------- SYSTEM ENABLED -------------\n"  ));
-
-    #if !MOCK_SENSORS
-      analogReference(INTERNAL);
-      tempSensor.begin();
-
-      post();
-    #endif
-
     connectToHeater();
   }
 
