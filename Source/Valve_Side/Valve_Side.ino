@@ -465,6 +465,14 @@ void serialEvent()
   {
     stopPump();
   }
+  else if(strcmp(buffer,"openvalve") == 0)
+  {
+    digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
+  }
+  else if(strcmp(buffer,"closevalve") == 0)
+  {
+    digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
+  }
   
 
   #if MOCK_SENSORS
