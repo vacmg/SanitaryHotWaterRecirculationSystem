@@ -427,9 +427,9 @@ void serialEvent()
   if(strcmp(buffer,"help") == 0)
   {
     #if MOCK_SENSORS
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
     #else
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\n"));
+      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
     #endif
   }
   else if(strcmp(buffer,"clear") == 0)
@@ -686,9 +686,9 @@ void setup()
 
   #if MOCK_SENSORS
     Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\nPress e or d to enable or disable trigger\nor send a number to incorporate it as valve temp\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
   #else
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system; 'clear' to invalidate the Error Register; 'sensors' to print all the sensors current value; 'startpump' or 'stoppump' to manually start or stop the pump; or 'errorlist' to print the error list\n"));
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
   #endif
     
   delay(1000);
