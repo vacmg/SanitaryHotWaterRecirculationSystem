@@ -202,14 +202,17 @@ void error(ErrorCode err, const char* message, bool printName)
     #endif
   }
 
-  delay(5000);
+  delay(3000);
   if(Serial.available())
   {
     serialEvent();
   }
 
-  Serial.print(F("System is rebooting"));
-  rebootLoop();
+  if(SYSTEM_ENABLED || err == NO_ERROR)
+  {
+    Serial.print(F("System is rebooting"));
+    rebootLoop();
+  }
 }
 
 
