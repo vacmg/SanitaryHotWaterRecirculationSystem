@@ -228,8 +228,9 @@ void setup()
   digitalWrite(pumpRelayPin,RELAY_DISABLED);
   Serial.begin(9600); // Used for debug purposes
   delay(3000);
-  Serial.println(F("\n------------------------------------------"));
-  Serial.println(F(  "|                SHWRS-HS                |"));
+  Serial.println(F("\n------------------------------------------"  ));
+  Serial.println(F(  "|                SHWRS-HS                |"  ));
+  Serial.println(F(  "|                V1.0.0R1                |"  ));
   Serial.println(F(  "------------------------------------------\n"));
   
   #if !MOCK_SENSORS

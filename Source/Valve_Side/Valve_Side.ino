@@ -650,6 +650,7 @@ void setup()
   delay(3000);
   Serial.println(F("\n------------------------------------------"  ));
   Serial.println(F(  "|                SHWRS-VS                |"  ));
+  Serial.println(F(  "|                V1.0.0R1                |"  ));
   Serial.println(F(  "------------------------------------------\n"));
   wdt_reset();
 
@@ -724,6 +725,7 @@ void loop()
 
               heaterTempPMillis = 0; // Set millis timers
               valveTempPMillis = 0;
+              getHeaterTemp();
               changeStatus(DrivingWater);
             }
             else 
@@ -778,13 +780,12 @@ void loop()
 
           digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
           changeStatus(ServingWater);
+          getHeaterTempIfNecessary();
         }
 
       break;
 
       case ServingWater:
-
-        getHeaterTempIfNecessary();
 
         if(getValveTempIfNecessary() && !isTriggerActive() && valveTemp < desiredTemp)
         {
