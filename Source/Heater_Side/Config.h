@@ -24,7 +24,7 @@
 
 const float MIN_ALLOWED_TEMP = 0; // 0ºC
 const float MAX_ALLOWED_TEMP = 60; // 60ºc
-const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 3; // mA
+const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
 const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
 const long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
