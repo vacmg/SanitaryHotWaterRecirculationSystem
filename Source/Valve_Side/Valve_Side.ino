@@ -19,7 +19,18 @@ const uint8_t TX_PIN = 3; // Serial data out pin
 
 const uint8_t VALVE_RELAY_PIN = 2;
 
+const uint8_t RED_LED_PIN = 11;
+const uint8_t GREEN_LED_PIN = 9;
+const uint8_t BLUE_LED_PIN = 10;
+
+#if USE_BUTTON
+
+const uint8_t BUTTON_PIN = 7;
+
+#endif
+
 bool SYSTEM_ENABLED = false;
+bool MINIMAL_WORKING_STATE_ENABLED = false;
 
 #if !MOCK_SENSORS
 const uint8_t PRESSURE_SENSOR = A0;
@@ -34,12 +45,27 @@ DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Create rs485 instance
 
 
-typedef enum SystemStatus{WaitingCold, DrivingWater, ServingWater} Status;
-#define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; debug(F(" to ")); debugln(statusToString(status));} while(0)
+typedef enum {MinimalWorkingState, WaitingCold, DrivingWater, ServingWater} Status;
+#define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; writeColor(statusToColor(status)); debug(F(" to ")); debugln(statusToString(status));} while(0)
 
 typedef enum {NO_ERROR = 0, ERROR_INTERNAL, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
 #define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
 #define ERROR_MESSAGE_SIZE (EEPROM_USED_SIZE-(sizeof(char)*4)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
+
+typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
+#define BOOT_COLOR Green
+#define RESTART_COLOR White
+#define USER_ACK_COLOR Cyan
+#define MINIMAL_WORKING_STATE_COLOR Yellow
+#define WAITING_COLD_COLOR Black
+#define DRIVING_WATER_COLOR Blue
+#define SERVING_WATER_COLOR Red
+#define SYSTEM_DISABLED_COLOR Gray
+
+#if USE_BUTTON
+typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
+#endif
+
 
 typedef struct 
 {
@@ -122,6 +148,55 @@ void printErrorData(ErrorData& data, bool printAll = false)
 }
 
 
+void writeColor(Color color)
+{
+  switch(color)
+  {
+    case Black:
+      writeColor(0,0,0);
+      break;
+    case Red:
+      writeColor(255,0,0);
+      break;
+    case Green:
+      writeColor(0,255,0);
+      break;
+    case Blue:
+      writeColor(0,0,255);
+      break;
+    case Yellow:
+      writeColor(255,255,0);
+      break;
+    case Purple:
+      writeColor(255,0,255);
+      break;
+    case Cyan:
+      writeColor(0,255,255);
+      break;
+    case White:
+      writeColor(255,255,255);
+      break;
+    case Gray:
+      writeColor(1,1,1);
+      break;
+  }
+}
+
+
+void writeColor(uint8_t r, uint8_t g, uint8_t b)
+{
+  #if LED_ENABLED
+    analogWrite(RED_LED_PIN, r);
+    analogWrite(GREEN_LED_PIN, g);
+    analogWrite(BLUE_LED_PIN, b);
+  #else
+    analogWrite(RED_LED_PIN, 255-r);
+    analogWrite(GREEN_LED_PIN, 255-g);
+    analogWrite(BLUE_LED_PIN, 255-b);
+  #endif
+}
+
+
 void startPump()
 {
   char buffer[17];
@@ -186,6 +261,7 @@ void stopPump()
 
 void error(ErrorCode err, const char* message, bool printName)
 {
+  wdt_reset();
   Serial.println(F("\n-----------------------------------------"));
   Serial.println(F("-----------------------------------------"));
   Serial.print(F("ERROR ")); if(printName){Serial.print(getErrorName(err));} Serial.print(F(": (")); Serial.print(err); Serial.print(")\n");
@@ -208,9 +284,22 @@ void error(ErrorCode err, const char* message, bool printName)
     serialEvent();
   }
 
+#if USE_BUTTON
+  if((SYSTEM_ENABLED && !MINIMAL_WORKING_STATE_ENABLED) || err == NO_ERROR)
+#else
   if(SYSTEM_ENABLED || err == NO_ERROR)
+#endif
   {
+  #if USE_BUTTON
+    if(err != NO_ERROR)
+    {
+      debug(F("Changing MINIMAL_WORKING_STATE_ENABLED from ")); debug(MINIMAL_WORKING_STATE_ENABLED);debug(F(" to ")); debugln(true);
+      EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, true);
+      writeColor(MINIMAL_WORKING_STATE_COLOR);
+    }
+  #endif
     Serial.print(F("System is rebooting"));
+    writeColor(RESTART_COLOR);
     rebootLoop();
   }
 }
@@ -245,6 +334,8 @@ const char* statusToString(Status status)
 {
   switch (status) 
   {
+    case MinimalWorkingState:
+      return "MinimalWorkingState";
     case WaitingCold:
       return "WaitingCold";
     case DrivingWater:
@@ -253,6 +344,23 @@ const char* statusToString(Status status)
       return "ServingWater";
   }
 }
+
+
+Color statusToColor(Status status)
+{
+  switch (status) 
+  {
+    case MinimalWorkingState:
+      return MINIMAL_WORKING_STATE_COLOR;
+    case WaitingCold:
+      return WAITING_COLD_COLOR;
+    case DrivingWater:
+      return DRIVING_WATER_COLOR;
+    case ServingWater:
+      return SERVING_WATER_COLOR;
+  }
+}
+
 
 #if !MOCK_SENSORS
 float getValveTemp()
@@ -404,6 +512,8 @@ void printSensorsInfo()
 {
   Serial.println(F("\n-----------------------------------------"  ));
   Serial.println(F(  "Sensor list:\n"));
+  Serial.print(F(    "System Enabled: ")); Serial.println(SYSTEM_ENABLED?"True":"False");
+  Serial.print(F(    "Minimal Working State Enabled: ")); Serial.println(MINIMAL_WORKING_STATE_ENABLED?"True":"False");
   #if MOCK_SENSORS
     Serial.println(F("Valve pressure sensor: MOCKED"));
     Serial.print(F(  "Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp);Serial.println(F("ºC"));
@@ -429,10 +539,9 @@ void serialEvent()
 
   if(strcmp(buffer,"help") == 0)
   {
+    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
     #if MOCK_SENSORS
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
-    #else
-      Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
+      Serial.println(F("\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
     #endif
   }
   else if(strcmp(buffer,"clear") == 0)
@@ -455,6 +564,16 @@ void serialEvent()
   {
     EEPROM.put(ENABLE_REGISTER_ADDRESS, false);
     error(NO_ERROR,"Rebooting to disable the system");
+  }
+  else if(strcmp(buffer,"setminimal") == 0)
+  {
+    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
+    error(NO_ERROR,"Rebooting to enable the minimal mode");
+  }
+  else if(strcmp(buffer,"clearminimal") == 0)
+  {
+    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
+    error(NO_ERROR,"Rebooting to disable the minimal mode");
   }
   else if(strcmp(buffer,"sensors") == 0)
   {
@@ -635,16 +754,80 @@ void post()
 #endif
 
 
+#if USE_BUTTON
+ButtonStatus readButton()
+{
+  ButtonStatus res = NO_PULSE;
+  if(!digitalRead(BUTTON_PIN))
+  {
+    unsigned long time = millis();
+    delay(10);
+    while(!digitalRead(BUTTON_PIN) && millis() - time < BUTTON_LONG_PRESSED_TIME)
+    {
+      #if !DISABLE_WATCHDOGS
+        resetWatchdogs();
+      #endif
+    }
+
+    time = millis() - time;
+
+    if(time >= BUTTON_LONG_PRESSED_TIME)
+    {
+      debug(F("Long press detected: ")); debugln(time);
+      res = LONG_PULSE;
+    }
+    else if (time >= BUTTON_SHORT_PRESSED_MIN_TIME)
+    {
+      debug(F("Short press detected: ")); debugln(time);
+      res = SHORT_PULSE;
+    }
+  }
+  return res;
+}
+#endif
+
+
 void setup() 
 {
   wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
+
+  pinMode(VALVE_RELAY_PIN,OUTPUT);
+
+#if USE_BUTTON
+  EEPROM.get(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, MINIMAL_WORKING_STATE_ENABLED);
+  if(MINIMAL_WORKING_STATE_ENABLED)
+  {
+    digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
+  }
+  else
+  {
+    digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
+  }
+#endif
+
+  pinMode(RED_LED_PIN, OUTPUT);
+  pinMode(GREEN_LED_PIN, OUTPUT);
+  pinMode(BLUE_LED_PIN, OUTPUT);
+
+#if TEST_COLORS
+  writeColor(Red);
+  delay(500);
+  writeColor(Green);
+  delay(500);
+  writeColor(Blue);
+  delay(500);
+  writeColor(Black);
+  delay(1000);
+#endif
+
+  writeColor(RESTART_COLOR);
+
   #if !DISABLE_WATCHDOGS
     delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
     wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
   #endif
 
-  pinMode(VALVE_RELAY_PIN,OUTPUT);
-  digitalWrite(VALVE_RELAY_PIN,RELAY_DISABLED); // TODO check valve feedback pin
+  writeColor(BOOT_COLOR);
 
   Serial.begin(9600); // Used for debug purposes
   delay(3000);
@@ -659,6 +842,11 @@ void setup()
 
   Serial.println(F("Starting..."));
 
+  if(MINIMAL_WORKING_STATE_ENABLED)
+  {
+    Serial.println(F("\nWARNING: SYSTEM UNDER MINIMAL CONDITIONS\n\n"));
+  }
+
   rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
   delay(1000);
 
@@ -668,7 +856,7 @@ void setup()
 
     post();
   #endif
-
+    
   if(!SYSTEM_ENABLED)
   {
     Serial.println(F("\n------------- SYSTEM DISABLED ------------\n"  ));
@@ -689,12 +877,30 @@ void setup()
 
   #if MOCK_SENSORS
     Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
-  #else
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
+  #endif
+  Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
+  #if MOCK_SENSORS
+    Serial.println(F("\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
   #endif
     
   delay(1000);
+
+#if USE_BUTTON
+  if(MINIMAL_WORKING_STATE_ENABLED)
+  {
+    changeStatus(MinimalWorkingState);
+    digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
+  }
+  else
+#endif
+  {
+    changeStatus(WaitingCold);
+  }
+
+  if(!SYSTEM_ENABLED)
+  {
+    writeColor(SYSTEM_DISABLED_COLOR);
+  }
 }
 
 
@@ -794,8 +1000,57 @@ void loop()
         }
 
       break;
+
+      #if USE_BUTTON
+      case MinimalWorkingState:
+      {
+        static int step = 255;
+        static bool up = false;
+
+        if(up)
+        {
+          if(step >= 254)
+          {
+            up = false;
+          }
+          step++;
+        }
+        else
+        {
+          if(step <= 1)
+          {
+            up = true;
+            delay(500);
+          }
+          step--;
+        }
+
+        writeColor(step, step, 0);
+        delay(ANIMATION_FRAME_DELAY);
+      }
+      break;
+      #endif
     }
   }
+
+  #if USE_BUTTON
+  switch(readButton())
+  {
+    case SHORT_PULSE:
+      debug(F("Changing MINIMAL_WORKING_STATE_ENABLED from ")); debug(MINIMAL_WORKING_STATE_ENABLED);debug(F(" to ")); debugln(!MINIMAL_WORKING_STATE_ENABLED);
+      EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
+      writeColor(USER_ACK_COLOR);
+      error(NO_ERROR,"Rebooting to apply new Minimal Working State");
+      
+      break;
+    case LONG_PULSE:
+      debug(F("Changing SYSTEM_ENABLED from ")); debug(SYSTEM_ENABLED);debug(F(" to ")); debugln(!SYSTEM_ENABLED);
+      EEPROM.put(ENABLE_REGISTER_ADDRESS, !SYSTEM_ENABLED);
+      writeColor(USER_ACK_COLOR);
+      error(NO_ERROR,"Rebooting to apply new System Enable State");
+      break;
+  }
+  #endif
 
   #if !DISABLE_WATCHDOGS
   resetWatchdogs();

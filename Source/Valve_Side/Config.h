@@ -7,20 +7,28 @@
 
 #include<avr/wdt.h>
 
+#define VS "V1.0.0"
+
 #define DEBUG 0
 #define DEBUGWATCHDOG 0
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
 #define MOCK_SENSORS 0
+#define USE_BUTTON 1
+#define TEST_COLORS 0
+#define EEPROM_DONT_WRITE 0 // Only works for errors
 
 #define ERROR_REGISTER_ADDRESS 0
 #define EEPROM_USED_SIZE 400
 #define EEPROM_ERROR_MAGIC_STR "V1"
-#define EEPROM_DONT_WRITE 0
 
 #define ENABLE_REGISTER_ADDRESS ERROR_REGISTER_ADDRESS + 1 + sizeof(ErrorData)
+#define MINIMAL_WORKING_MODE_REGISTER_ADDRESS ENABLE_REGISTER_ADDRESS + 1 + sizeof(SYSTEM_ENABLED)
 
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED
+
+#define LED_ENABLED 0
+#define LED_DISABLED !LED_ENABLED
 
 const float MIN_ALLOWED_TEMP = 0; // 0ºC
 const float MAX_ALLOWED_TEMP = 60; // 60ºc
@@ -29,9 +37,12 @@ const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
 const long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
 const long INIT_CONNECTION_TIMEOUT_IF_DISABLED = 12000; // 12 sec
-const int WATCHDOG_RESET_PERIOD = 6000; // 7.5 s
+const int WATCHDOG_RESET_PERIOD = 6000; // 6 s
 const int RECEIVED_MESSAGE_TIMEOUT = 100; // 100 ms
 const long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
+const int BUTTON_LONG_PRESSED_TIME = 2500; // 2.5 s
+const int BUTTON_SHORT_PRESSED_MIN_TIME = 350; // ms
+const int ANIMATION_FRAME_DELAY = 2; // ms
 const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 const int VALVE_TEMP_GATHERING_PERIOD = 1000; // 1 s
 const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve
