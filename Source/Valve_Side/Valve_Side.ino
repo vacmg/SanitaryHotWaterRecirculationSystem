@@ -80,6 +80,8 @@ ErrorData;
 
 int heaterTemp = 0;
 int desiredTemp = INT16_MAX;
+int fadeMinTemp = 0;
+
 unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
 unsigned long watchdogsPMillis = 0;
@@ -217,6 +219,12 @@ void writeColor(uint8_t r, uint8_t g, uint8_t b)
     analogWrite(GREEN_LED_PIN, 255-g);
     analogWrite(BLUE_LED_PIN, 255-b);
   #endif
+}
+
+
+void updateColorToProgress(uint8_t progress)
+{
+  writeColor(progress, 0, 255-progress);
 }
 
 
@@ -997,6 +1005,7 @@ void loop()
               valveTempPMillis = 0;
               getHeaterTemp();
               changeStatus(DrivingWater);
+              fadeMinTemp = heaterTemp;
             }
             else 
             {
@@ -1017,41 +1026,48 @@ void loop()
 
         getHeaterTempIfNecessary();
 
-        if(getValveTempIfNecessary() && valveTemp >= desiredTemp) // compare temps & change phase
+        if(getValveTempIfNecessary())
         {
-          sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
-          rs485.print(buffer);
-          debugln(F("PUMP OFF CMD SENT"));
-          delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-          if(rs485.available() && rs485.find(HEADER))
+          /*long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, 255);
+          debug(F("Progress: ")); debug((progress*100)/256); debug(F(" (")); debug(progress); debugln(F(")"));
+          updateColorToProgress(progress);//*/
+          if(valveTemp >= desiredTemp) // compare temps & change phase
           {
-            size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-            buffer[dataSize] = '\0';
+            sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
+            rs485.print(buffer);
+            debugln(F("PUMP OFF CMD SENT"));
+            delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
 
-            if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
+            if(rs485.available() && rs485.find(HEADER))
             {
-              debugln(F("PUMP CMD RESULT: OK"));
+              size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+              buffer[dataSize] = '\0';
 
-              heaterTempPMillis = 0; // Set millis timers
-              valveTempPMillis = 0;
-              changeStatus(DrivingWater);
+              if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
+              {
+                debugln(F("PUMP CMD RESULT: OK"));
+
+                heaterTempPMillis = 0; // Set millis timers
+                valveTempPMillis = 0;
+                changeStatus(DrivingWater);
+              }
+              else 
+              {
+                sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
+                error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+              }
             }
             else 
             {
-              sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
-              error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+              error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
             }
-          }
-          else 
-          {
-            error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
-          }
 
-          digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
-          changeStatus(ServingWater);
-          getHeaterTempIfNecessary();
+            digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
+            changeStatus(ServingWater);
+            getHeaterTempIfNecessary();
+          }
         }
+        
 
       break;
 
