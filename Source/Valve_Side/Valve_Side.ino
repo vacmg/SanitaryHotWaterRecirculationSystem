@@ -1005,7 +1005,7 @@ void loop()
               valveTempPMillis = 0;
               getHeaterTemp();
               changeStatus(DrivingWater);
-              fadeMinTemp = heaterTemp;
+              fadeMinTemp = valveTemp;
             }
             else 
             {
@@ -1028,10 +1028,11 @@ void loop()
 
         if(getValveTempIfNecessary())
         {
-          long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, 255);
-          debug(F("valveTemp: ")); debug(valveTemp); debug(F("\tfadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/255); debug(F(" (")); debug(progress); debugln(F(")"));
-
-          /*updateColorToProgress(progress);//*/
+          long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, MAX_PROGRESS_VALUE);
+          debug(F("valveTemp: ")); debug(valveTemp); debug(F("\tfadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F(" (")); debug(progress); debugln(F(")"));
+          #if COLOR_PROGRESS_FEEDBACK
+            updateColorToProgress(progress);
+          #endif
           if(valveTemp >= desiredTemp) // compare temps & change phase
           {
             sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
