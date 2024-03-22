@@ -650,7 +650,7 @@ void setup()
   delay(3000);
   Serial.println(F("\n------------------------------------------"  ));
   Serial.println(F(  "|                SHWRS-VS                |"  ));
-  Serial.println(F(  "|                V1.0.0R1                |"  ));
+  Serial.println(F(  "|                 " VS "                 |"  ));
   Serial.println(F(  "------------------------------------------\n"));
   wdt_reset();
 
