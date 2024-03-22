@@ -59,10 +59,10 @@ typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
 #define RESTART_COLOR White
 #define USER_ACK_COLOR Cyan
 #define MINIMAL_WORKING_STATE_COLOR Yellow
-#define WAITING_COLD_COLOR Black
+#define WAITING_COLD_COLOR Gray
 #define DRIVING_WATER_COLOR Blue
 #define SERVING_WATER_COLOR Red
-#define SYSTEM_DISABLED_COLOR Gray
+#define SYSTEM_DISABLED_COLOR Black
 
 #if USE_BUTTON
 typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
@@ -599,8 +599,7 @@ void serialEvent()
   else if(strcmp(buffer,"clear") == 0)
   {
     invalidateErrorData();
-    Serial.print(F("Error Register Invalidated\nRebooting"));
-    rebootLoop();
+    error(NO_ERROR, F("Error Register Invalidated"));
   }
   else if(strcmp(buffer,"errorlist") == 0)
   {
@@ -722,7 +721,8 @@ void connectToHeater(bool ignoreErrors = false)
 
   long timeout = (SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED);
 
-  debug(F("Connecting to heater MCU... Max time: ")); debug(timeout); debugln(F("ms"));
+  char buff[32];
+  debug(F("Connecting to heater MCU... Max time: ")); debugln(formattedTime(timeout,buff));
 
   while(!connected && (millis() - connectionPMillis) < timeout)
   {
@@ -787,7 +787,7 @@ void connectToHeater(bool ignoreErrors = false)
   }
   else
   {
-    debugln(F("Connected to heater MCU!!!"));
+    debug(F("Connected to heater MCU in ")); debugln(formattedTime(millis() - watchdogsPMillis,buff));
   }
 
   delay(1500);
@@ -854,10 +854,11 @@ void setup()
   wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
 
   pinMode(VALVE_RELAY_PIN,OUTPUT);
+  EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
 
 #if USE_BUTTON
   EEPROM.get(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, MINIMAL_WORKING_STATE_ENABLED);
-  if(MINIMAL_WORKING_STATE_ENABLED)
+  if(SYSTEM_ENABLED && MINIMAL_WORKING_STATE_ENABLED)
   {
     digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
   }
@@ -865,6 +866,8 @@ void setup()
   {
     digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
   }
+#else
+  digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
 #endif
 
   pinMode(RED_LED_PIN, OUTPUT);
@@ -917,8 +920,6 @@ void setup()
 
     post();
   #endif
-
-  EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
     
   if(!SYSTEM_ENABLED)
   {
@@ -953,7 +954,6 @@ void setup()
   if(MINIMAL_WORKING_STATE_ENABLED)
   {
     changeStatus(MinimalWorkingState);
-    digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
   }
   else
 #endif
