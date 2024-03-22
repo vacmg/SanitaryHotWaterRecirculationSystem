@@ -1028,9 +1028,10 @@ void loop()
 
         if(getValveTempIfNecessary())
         {
-          /*long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, 255);
-          debug(F("Progress: ")); debug((progress*100)/256); debug(F(" (")); debug(progress); debugln(F(")"));
-          updateColorToProgress(progress);//*/
+          long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, 255);
+          debug(F("valveTemp: ")); debug(valveTemp); debug(F("\tfadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/255); debug(F(" (")); debug(progress); debugln(F(")"));
+
+          /*updateColorToProgress(progress);//*/
           if(valveTemp >= desiredTemp) // compare temps & change phase
           {
             sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
