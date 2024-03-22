@@ -51,7 +51,8 @@ typedef enum {MinimalWorkingState, WaitingCold, DrivingWater, ServingWater} Stat
 
 typedef enum {NO_ERROR = 0, ERROR_INTERNAL, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
 #define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
-#define ERROR_MESSAGE_SIZE (EEPROM_USED_SIZE-(sizeof(char)*4)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
+#define ERROR_MESSAGE_SIZE (EEPROM_USED_SIZE-((sizeof(char)*3)*NUM_OF_ERROR_TYPES)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
+#define errorDataAddress(errorCode) (ERROR_REGISTER_ADDRESS + (sizeof(ErrorData) * errorCode))
 
 typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
 #define BOOT_COLOR Green
@@ -70,9 +71,9 @@ typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 
 typedef struct 
 {
+  bool flag;
+  char message[ERROR_MESSAGE_SIZE];
   char magic[sizeof(EEPROM_ERROR_MAGIC_STR)];
-  bool flags[NUM_OF_ERROR_TYPES];
-  char message[NUM_OF_ERROR_TYPES][ERROR_MESSAGE_SIZE];
 } 
 ErrorData;
 
@@ -83,8 +84,6 @@ unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
 unsigned long watchdogsPMillis = 0;
 Status status = WaitingCold;
-
-ErrorData errorData;
 
 #if MOCK_SENSORS
 bool triggerVal = false;
@@ -126,26 +125,49 @@ const char* getErrorName(ErrorCode error)
 }
 
 
-void printErrorData(ErrorData& data, bool printAll = false)
+void printErrorData(bool printAll = false)
 {
-  if(strcmp(errorData.magic,EEPROM_ERROR_MAGIC_STR) == 0)
+  Serial.println(F("\n-----------------------------------------"));
+  Serial.println(F("Error list:\n"));
+  for(uint8_t i = NO_ERROR + 1; i<NUM_OF_ERROR_TYPES;i++)
   {
-    Serial.println(F("\n-----------------------------------------"));
-    Serial.println(F("Error list:\n"));
-    for(uint8_t i = NO_ERROR + 1; i<NUM_OF_ERROR_TYPES;i++)
+    ErrorData data;
+    EEPROM.get(errorDataAddress(i), data);
+    if(strcmp(data.magic,EEPROM_ERROR_MAGIC_STR) == 0)
     {
-      if(printAll || data.flags[i])
+      if(printAll || data.flag)
       {
         Serial.print(getErrorName((ErrorCode)i)); Serial.print(F(":\t"));
-        Serial.println(data.flags[i]?data.message[i]:"OK");
+        Serial.println(data.flag?data.message:"OK");
       }
     }
+    else
+    {
+      Serial.println(F("-----------------------------------------"));
+      Serial.print(F("ErrorData of error: "));Serial.print(getErrorName((ErrorCode)i)); Serial.println(F(" is not valid\nRestoring it...\t"));
+
+      memset(&data,'\0',sizeof(ErrorData));
+      strcpy(data.magic,EEPROM_ERROR_MAGIC_STR);
+
+      EEPROM.put(errorDataAddress(i), data);
+
+      Serial.println(F("DONE"));
+      Serial.println(F("-----------------------------------------\n"));
+    }
   }
-  else
+  Serial.println(F("-----------------------------------------\n"));
+}
+
+
+void invalidateErrorData()
+{
+  for(uint8_t i = NO_ERROR + 1; i<NUM_OF_ERROR_TYPES;i++)
   {
-    Serial.println(F("ErrorData is not valid\n"));
+    ErrorData data;
+    EEPROM.get(errorDataAddress(i), data);
+    data.magic[0]++;
+    EEPROM.put(errorDataAddress(i), data);
   }
-  Serial.println(F("-----------------------------------------\n"));;
 }
 
 
@@ -272,10 +294,14 @@ void error(ErrorCode err, const char* message, bool printName)
 
   if(err != NO_ERROR)
   {
-    errorData.flags[err] = true;
-    strcpy(errorData.message[err],message);
+    ErrorData errorData;
+    EEPROM.get(errorDataAddress(err), errorData);
+    
+    errorData.flag = true;
+    strcpy(errorData.message, message);
+
     #if !EEPROM_DONT_WRITE
-      EEPROM.put(ERROR_REGISTER_ADDRESS,errorData);
+      EEPROM.put(errorDataAddress(err), errorData);
     #endif
   }
 
@@ -312,23 +338,10 @@ void error(ErrorCode err, const char* message)
 }
 
 
-void loadErrorRegister()
 {
-  EEPROM.get(ERROR_REGISTER_ADDRESS, errorData);
-  if(strcmp(errorData.magic,EEPROM_ERROR_MAGIC_STR) != 0)
-  {
-    Serial.println(F("-----------------------------------------"));
-    Serial.print(F("WARNING:\tEEPROM empty or corrupted\nRestoring it...\t"));
-    memset(&errorData,'\0',sizeof(errorData));
-    strcpy(errorData.magic,EEPROM_ERROR_MAGIC_STR);
 
-    EEPROM.put(ERROR_REGISTER_ADDRESS, errorData);
 
-    Serial.println(F("DONE"));
-    Serial.println(F("-----------------------------------------\n"));
   }
-  printErrorData(errorData);
-}
 
 
 const char* statusToString(Status status)
@@ -513,7 +526,7 @@ const char* formattedTime(long time, char* buff)
 {
   if(time<0)
   {
-    strcpy("None", buff);
+    strcpy(buff, "None");
     return buff;
   }
 
@@ -571,14 +584,13 @@ void serialEvent()
   }
   else if(strcmp(buffer,"clear") == 0)
   {
-    errorData.magic[0]++;
-    EEPROM.put(ERROR_REGISTER_ADDRESS, errorData);
+    invalidateErrorData();
     Serial.print(F("Error Register Invalidated\nRebooting"));
     rebootLoop();
   }
   else if(strcmp(buffer,"errorlist") == 0)
   {
-    printErrorData(errorData,true);
+    printErrorData(true);
   }
   else if(strcmp(buffer,"enable") == 0)
   {
@@ -873,8 +885,7 @@ void setup()
   Serial.println(F(  "------------------------------------------\n"));
   wdt_reset();
 
-  EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
-  loadErrorRegister();
+  printErrorData();
 
   Serial.println(F("Starting..."));
 
