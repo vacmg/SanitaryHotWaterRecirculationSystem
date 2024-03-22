@@ -338,10 +338,8 @@ void error(ErrorCode err, const char* message)
 }
 
 
-{
 
 
-  }
 
 
 const char* statusToString(Status status)
