@@ -12,10 +12,10 @@
 #include <DallasTemperature.h>
 #endif
 
-const uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
-const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
-const uint8_t RX_PIN = 11; // Serial data in pin
-const uint8_t TX_PIN = 8; // Serial data out pin
+const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
+const uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
+const uint8_t RX_PIN = 6; // Serial data in pin
+const uint8_t TX_PIN = 3; // Serial data out pin
 
 const uint8_t VALVE_RELAY_PIN = 2;
 
