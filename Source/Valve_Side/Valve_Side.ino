@@ -246,7 +246,7 @@ void startPump()
   }
   else 
   {
-    error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+    error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
   }
 }
 
@@ -277,7 +277,7 @@ void stopPump()
   }
   else 
   {
-    error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+    error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
   }
 }
 
@@ -338,9 +338,25 @@ void error(ErrorCode err, const char* message)
 }
 
 
+void error(ErrorCode err, const __FlashStringHelper* message)
+{
+  char buff[ERROR_MESSAGE_SIZE];
 
+  PGM_P p = reinterpret_cast<PGM_P>(message);
+  unsigned int i = 0;
+  while (1) 
+  {
+    unsigned char c = pgm_read_byte(p++);
 
+    buff[i++] = c;
+    if (c == 0)
+    {
+      break;
+    }
+  }
 
+  error(err, buff, 1);
+}
 
 const char* statusToString(Status status)
 {
@@ -490,7 +506,7 @@ void getHeaterTemp(bool ignoreErrors = false)
   {
     if(!ignoreErrors)
     {
-      error(ERROR_RS485_NO_RESPONSE,"Timeout receiving TEMP CMD ANSWER");
+      error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving TEMP CMD ANSWER"));
     }
   }
 }
@@ -593,22 +609,22 @@ void serialEvent()
   else if(strcmp(buffer,"enable") == 0)
   {
     EEPROM.put(ENABLE_REGISTER_ADDRESS, true);
-    error(NO_ERROR,"Rebooting to enable the system");
+    error(NO_ERROR, F("Rebooting to enable the system"));
   }
   else if(strcmp(buffer,"disable") == 0)
   {
     EEPROM.put(ENABLE_REGISTER_ADDRESS, false);
-    error(NO_ERROR,"Rebooting to disable the system");
+    error(NO_ERROR, F("Rebooting to disable the system"));
   }
   else if(strcmp(buffer,"setminimal") == 0)
   {
     EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
-    error(NO_ERROR,"Rebooting to enable the minimal mode");
+    error(NO_ERROR, F("Rebooting to enable the minimal mode"));
   }
   else if(strcmp(buffer,"clearminimal") == 0)
   {
     EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
-    error(NO_ERROR,"Rebooting to disable the minimal mode");
+    error(NO_ERROR, F("Rebooting to disable the minimal mode"));
   }
   else if(strcmp(buffer,"sensors") == 0)
   {
@@ -689,7 +705,7 @@ void resetWatchdogs()
     }
     else if (SYSTEM_ENABLED)
     {
-      error(ERROR_RS485_NO_RESPONSE,"Timeout receiving WTD_RST CMD ANSWER");
+      error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving WTD_RST CMD ANSWER"));
     }
   }
 }
@@ -766,7 +782,7 @@ void connectToHeater(bool ignoreErrors = false)
     }
     else
     {
-      error(ERROR_CONNECTION_NOT_ESTABLISHED,"ERROR: Cannot connect to heater MCU");
+      error(ERROR_CONNECTION_NOT_ESTABLISHED, F("ERROR: Cannot connect to heater MCU"));
     }
   }
   else
@@ -794,7 +810,7 @@ void checkResetTime()
   #if ENABLE_AUTO_RESTART
     if((status == WaitingCold || status == MinimalWorkingState) && (millis() > SYSTEM_RESET_PERIOD))
     {
-      error(NO_ERROR,"INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout", 0);
+      error(NO_ERROR, F("INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout"));
     }
   #endif
 }
@@ -989,7 +1005,7 @@ void loop()
           }
           else 
           {
-            error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+            error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
           }
         }
 
@@ -1027,7 +1043,7 @@ void loop()
           }
           else 
           {
-            error(ERROR_RS485_NO_RESPONSE,"Timeout receiving PUMP CMD ANSWER");
+            error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
           }
 
           digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
@@ -1086,14 +1102,14 @@ void loop()
       debug(F("Changing MINIMAL_WORKING_STATE_ENABLED from ")); debug(MINIMAL_WORKING_STATE_ENABLED);debug(F(" to ")); debugln(!MINIMAL_WORKING_STATE_ENABLED);
       EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
       writeColor(USER_ACK_COLOR);
-      error(NO_ERROR,"Rebooting to apply new Minimal Working State");
+      error(NO_ERROR, F("Rebooting to apply new Minimal Working State"));
       
       break;
     case LONG_PULSE:
       debug(F("Changing SYSTEM_ENABLED from ")); debug(SYSTEM_ENABLED);debug(F(" to ")); debugln(!SYSTEM_ENABLED);
       EEPROM.put(ENABLE_REGISTER_ADDRESS, !SYSTEM_ENABLED);
       writeColor(USER_ACK_COLOR);
-      error(NO_ERROR,"Rebooting to apply new System Enable State");
+      error(NO_ERROR, F("Rebooting to apply new System Enable State"));
       break;
   }
   #endif
