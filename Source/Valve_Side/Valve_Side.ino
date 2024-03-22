@@ -917,6 +917,8 @@ void setup()
 
     post();
   #endif
+
+  EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
     
   if(!SYSTEM_ENABLED)
   {
