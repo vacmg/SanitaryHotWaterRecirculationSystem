@@ -508,10 +508,32 @@ bool isTriggerActive()
 }
 
 
+const char* formattedTime(long time, char* buff)
+{
+  if(time<0)
+  {
+    strcpy("None", buff);
+    return buff;
+  }
+
+  long ms = time%1000;
+  long s = time/1000;
+  long m = s/60;
+  long h = m/60;
+  m = m%60;
+  s = s%60;
+
+  sprintf(buff,"%lih %lim %lis %lims (%lims)",h,m,s,ms,time);
+  return buff;
+}
+
+
 void printSensorsInfo()
 {
+  char buff[64];
   Serial.println(F("\n-----------------------------------------"  ));
   Serial.println(F(  "Sensor list:\n"));
+  Serial.print(F(    "Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - millis(), buff));
   Serial.print(F(    "System Enabled: ")); Serial.println(SYSTEM_ENABLED?"True":"False");
   Serial.print(F(    "Minimal Working State Enabled: ")); Serial.println(MINIMAL_WORKING_STATE_ENABLED?"True":"False");
   #if MOCK_SENSORS
@@ -519,8 +541,10 @@ void printSensorsInfo()
     Serial.print(F(  "Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp);Serial.println(F("ºC"));
   #else
     Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure());Serial.println(F("BAR"));
+    wdt_reset();
     Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp());Serial.println(F("ºC"));
   #endif
+  wdt_reset();
   getHeaterTemp(true);
   Serial.print(F(    "Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
   Serial.print(F(    "Desired temperature: ")); Serial.print(desiredTemp);Serial.println(F("ºC"));
@@ -754,6 +778,15 @@ void post()
 #endif
 
 
+void checkResetTime()
+{
+  if((status == WaitingCold || status == MinimalWorkingState) && (millis() > SYSTEM_RESET_PERIOD))
+  {
+    error(NO_ERROR,"INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout");
+  }
+}
+
+
 #if USE_BUTTON
 ButtonStatus readButton()
 {
@@ -874,6 +907,7 @@ void setup()
 
   delay(500);
   printSensorsInfo();
+  wdt_reset();
 
   #if MOCK_SENSORS
     Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
@@ -1054,5 +1088,6 @@ void loop()
 
   #if !DISABLE_WATCHDOGS
   resetWatchdogs();
+  checkResetTime();
   #endif
 }
