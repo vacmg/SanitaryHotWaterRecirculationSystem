@@ -1003,9 +1003,16 @@ void loop()
 
               heaterTempPMillis = 0; // Set millis timers
               valveTempPMillis = 0;
-              getHeaterTemp();
               changeStatus(DrivingWater);
               fadeMinTemp = valveTemp;
+              for(uint8_t i = 0; i<6;i++)
+              {
+                delay(1000);
+                #if !DISABLE_WATCHDOGS
+                  resetWatchdogs();
+                #endif
+              }
+              getHeaterTemp();
             }
             else 
             {
