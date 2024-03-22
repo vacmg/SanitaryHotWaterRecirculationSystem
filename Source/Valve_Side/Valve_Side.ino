@@ -18,6 +18,7 @@ const uint8_t RX_PIN = 6; // Serial data in pin
 const uint8_t TX_PIN = 3; // Serial data out pin
 
 const uint8_t VALVE_RELAY_PIN = 2;
+// const uint8_t VALVE_FEEDBACK_PIN = 7;
 
 const uint8_t RED_LED_PIN = 11;
 const uint8_t GREEN_LED_PIN = 9;
@@ -25,7 +26,7 @@ const uint8_t BLUE_LED_PIN = 10;
 
 #if USE_BUTTON
 
-const uint8_t BUTTON_PIN = 7;
+const uint8_t BUTTON_PIN = 8;
 
 #endif
 
@@ -780,10 +781,12 @@ void post()
 
 void checkResetTime()
 {
-  if((status == WaitingCold || status == MinimalWorkingState) && (millis() > SYSTEM_RESET_PERIOD))
-  {
-    error(NO_ERROR,"INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout");
-  }
+  #if ENABLE_AUTO_RESTART
+    if((status == WaitingCold || status == MinimalWorkingState) && (millis() > SYSTEM_RESET_PERIOD))
+    {
+      error(NO_ERROR,"INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout", 0);
+    }
+  #endif
 }
 
 

@@ -16,6 +16,7 @@
 #define USE_BUTTON 1
 #define TEST_COLORS 0
 #define EEPROM_DONT_WRITE 0 // Only works for errors
+#define ENABLE_AUTO_RESTART 1
 
 #define ERROR_REGISTER_ADDRESS 0
 #define EEPROM_USED_SIZE 400
