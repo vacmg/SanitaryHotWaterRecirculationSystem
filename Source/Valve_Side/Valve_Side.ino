@@ -1005,7 +1005,7 @@ void loop()
               valveTempPMillis = 0;
               changeStatus(DrivingWater);
               valveTemp = getValveTemp();
-              fadeMinTemp = valveTemp;
+              fadeMinTemp = valveTemp - FADE_MIN_TEMP_OFFSET;
               for(uint8_t i = 0; i<6;i++)
               {
                 delay(1000);
@@ -1037,7 +1037,7 @@ void loop()
         if(getValveTempIfNecessary())
         {
           long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, MAX_PROGRESS_VALUE);
-          debug(F("valveTemp: ")); debug(valveTemp); debug(F("\tfadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F(" (")); debug(progress); debugln(F(")"));
+          debug(F("valveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tfadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F(" (")); debug(progress); debugln(F(")"));
           #if COLOR_PROGRESS_FEEDBACK
             updateColorToProgress(progress);
           #endif
