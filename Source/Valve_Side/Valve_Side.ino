@@ -289,6 +289,12 @@ void updateColorToProgress(uint8_t progress)
 char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors = true)
 {
   debug(requestAndBuffer); debugln(F(" request sent"));
+
+  while(rs485.available())
+  {
+    rs485.read(); // discard buffer
+  }
+
   rs485.print(requestAndBuffer);
   delay(delayMultiplier*RECEIVED_MESSAGE_TIMEOUT);
 
