@@ -32,6 +32,9 @@
 #define LED_ENABLED 0
 #define LED_DISABLED !LED_ENABLED
 
+const uint16_t SERIAL_USB_BAUD_RATE = 9600;
+const uint16_t RS485_SERIAL_BAUD_RATE = 9600;
+
 const float MIN_ALLOWED_TEMP = 0; // 0ºC
 const float MAX_ALLOWED_TEMP = 60; // 60ºc
 const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
@@ -47,6 +50,7 @@ const long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
 const int BUTTON_LONG_PRESSED_TIME = 2500; // 2.5 s
 const int BUTTON_SHORT_PRESSED_MIN_TIME = 350; // ms
 const int ANIMATION_FRAME_DELAY = 2; // ms
+const int FADE_MIN_TEMP_OFFSET = 2;
 const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 const int VALVE_TEMP_GATHERING_PERIOD = 1000; // 1 s
 const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve

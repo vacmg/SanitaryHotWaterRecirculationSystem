@@ -902,7 +902,7 @@ void setup()
 
   writeColor(BOOT_COLOR);
 
-  Serial.begin(9600); // Used for debug purposes
+  Serial.begin(SERIAL_USB_BAUD_RATE); // Used for debug purposes
   delay(3000);
   Serial.println(F("\n------------------------------------------"  ));
   Serial.println(F(  "|                SHWRS-VS                |"  ));
@@ -919,7 +919,7 @@ void setup()
     Serial.println(F("\nWARNING: SYSTEM UNDER MINIMAL CONDITIONS\n\n"));
   }
 
-  rs485.begin(9600,RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+  rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
   delay(1000);
 
   #if !MOCK_SENSORS

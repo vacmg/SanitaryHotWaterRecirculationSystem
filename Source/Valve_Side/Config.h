@@ -32,6 +32,9 @@
 #define LED_ENABLED 0
 #define LED_DISABLED !LED_ENABLED
 
+const uint16_t SERIAL_USB_BAUD_RATE = 9600;
+const uint16_t RS485_SERIAL_BAUD_RATE = 9600;
+
 const float MIN_ALLOWED_TEMP = 0; // 0ºC
 const float MAX_ALLOWED_TEMP = 60; // 60ºc
 const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
@@ -82,9 +85,7 @@ const char WTDRSTCMD[] = "WTD_RST";
 
 void rebootLoop()
 {
-  #if DISABLE_WATCHDOGS
-    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
-  #endif
+  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
 
   while (1) 
   {
