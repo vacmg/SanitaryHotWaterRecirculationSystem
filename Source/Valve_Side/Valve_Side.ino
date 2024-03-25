@@ -941,7 +941,7 @@ ButtonStatus readButton()
   #if MOCK_SENSORS
     res = btnSt;
   #else
-    if(!digitalRead(BUTTON_PIN))
+    if(digitalRead(BUTTON_PIN) == BTN_PRESSED)
     {
       unsigned long time = millis();
       delay(10);
@@ -980,6 +980,7 @@ void setup()
   EEPROM.get(ENABLE_REGISTER_ADDRESS, SYSTEM_ENABLED);
 
 #if USE_BUTTON
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
   EEPROM.get(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, MINIMAL_WORKING_STATE_ENABLED);
   if(SYSTEM_ENABLED && MINIMAL_WORKING_STATE_ENABLED)
   {
