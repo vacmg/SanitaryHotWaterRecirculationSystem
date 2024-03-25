@@ -108,25 +108,40 @@ double fmap(double x, double in_min, double in_max, double out_min, double out_m
 }
 
 
-const char* getErrorName(ErrorCode error) 
+char* strncpy_F(char* dest, const __FlashStringHelper* src, size_t size)
+{
+  PGM_P p = reinterpret_cast<PGM_P>(src);
+  for (size_t i = 0; i<size; i++) 
+  {
+    unsigned char c = pgm_read_byte(p++);
+
+    dest[i] = c;
+    if (c == 0)
+    {
+      break;
+    }
+  }
+
+  dest[size-1] = '\0';
+}
+
+
+const __FlashStringHelper* getErrorName(ErrorCode error) 
 {
   switch (error) 
   {
     case NO_ERROR:
-      return "NO_ERROR";
+      return F("NO_ERROR");
     case ERROR_TEMP_SENSOR_INVALID_VALUE:
-      return "ERROR_TEMP_SENSOR_INVALID_VALUE";
+      return F("ERROR_TEMP_SENSOR_INVALID_VALUE");
     case ERROR_PRESSURE_SENSOR_INVALID_VALUE:
-      return "ERROR_PRESSURE_SENSOR_INVALID_VALUE";
+      return F("ERROR_PRESSURE_SENSOR_INVALID_VALUE");
     case ERROR_RS485_NO_RESPONSE:
-      return "ERROR_RS485_NO_RESPONSE";
+      return F("ERROR_RS485_NO_RESPONSE");
     case ERROR_RS485_UNEXPECTED_MESSAGE:
-      return "ERROR_RS485_UNEXPECTED_MESSAGE";
+      return F("ERROR_RS485_UNEXPECTED_MESSAGE");
     case ERROR_CONNECTION_NOT_ESTABLISHED:
-      return "ERROR_CONNECTION_NOT_ESTABLISHED";
-    default:
-      sprintf(errorStrBuff,"Unknown Error (%d)",error);
-      return errorStrBuff;
+      return F("ERROR_CONNECTION_NOT_ESTABLISHED");
   }
 }
 
@@ -408,34 +423,29 @@ void error(ErrorCode err, const __FlashStringHelper* message)
   char buff[ERROR_MESSAGE_SIZE];
 
   PGM_P p = reinterpret_cast<PGM_P>(message);
-  for (uint8_t i = 0; i<ERROR_MESSAGE_SIZE; i++) 
-  {
-    unsigned char c = pgm_read_byte(p++);
-
-    buff[i] = c;
-    if (c == 0)
-    {
-      break;
-    }
-  }
-
-  buff[ERROR_MESSAGE_SIZE-1] = '\0';
+  strncpy_F(buff,message,ERROR_MESSAGE_SIZE);
 
   error(err, buff, 1);
 }
 
 const char* statusToString(Status status)
+
+const __FlashStringHelper* statusToString(Status status)
 {
   switch (status) 
   {
     case MinimalWorkingState:
       return "MinimalWorkingState";
+      return F("MinimalWorkingState");
     case WaitingCold:
       return "WaitingCold";
+      return F("WaitingCold");
     case DrivingWater:
       return "DrivingWater";
+      return F("DrivingWater");
     case ServingWater:
       return "ServingWater";
+      return F("ServingWater");
   }
 }
 
