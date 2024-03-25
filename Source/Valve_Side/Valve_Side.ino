@@ -94,6 +94,7 @@ Status status = WaitingCold;
 
 #if MOCK_SENSORS
 bool triggerVal = false;
+ButtonStatus btnSt = NO_PULSE;
 #endif
 
 int valveTemp = 0;
@@ -403,23 +404,30 @@ Color statusToColor(Status status)
 }
 
 
-#if !MOCK_SENSORS
 float getValveTemp()
 {
-  tempSensor.requestTemperatures(); // Request temp
-  float temp = tempSensor.getTempCByIndex(0); // Obtain temp
-  if(temp<MIN_ALLOWED_TEMP)
-  {
-    sprintf(errorStrBuff,"TEMP IS TOO LOW (%d)",(int)temp);
-    error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
-  }
-  else if(temp>MAX_ALLOWED_TEMP)
-  {
-    sprintf(errorStrBuff,"TEMP IS TOO HIGH (%d)",(int)temp);
-    error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
-  }
-  return temp;
+  #if !MOCK_SENSORS
+    tempSensor.requestTemperatures(); // Request temp
+    float temp = tempSensor.getTempCByIndex(0); // Obtain temp
+    if(temp<MIN_ALLOWED_TEMP)
+    {
+      sprintf(errorStrBuff,"TEMP IS TOO LOW (%d)",(int)temp);
+      error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
+    }
+    else if(temp>MAX_ALLOWED_TEMP)
+    {
+      sprintf(errorStrBuff,"TEMP IS TOO HIGH (%d)",(int)temp);
+      error(ERROR_TEMP_SENSOR_INVALID_VALUE,errorStrBuff);
+    }
+    return temp;
+  #else
+    return valveTemp;
+  #endif
+  
 }
+
+
+#if !MOCK_SENSORS
 
 double getValvePressure()
 {
@@ -446,9 +454,7 @@ bool getValveTempIfNecessary()
   {
     debug(F("Current valve temp:\t"));
 
-    #if !MOCK_SENSORS
-      valveTemp = getValveTemp();
-    #endif
+    valveTemp = getValveTemp();
     
     debug(valveTemp); debug(F("\tDesired temp:\t"));debugln(desiredTemp);
 
@@ -671,6 +677,21 @@ void serialEvent()
     Serial.println(F("Disabling trigger"));
     triggerVal = false;
   }
+  else if(strcmp(buffer,"n") == 0)
+  {
+    Serial.println(F("Button press set to NO_PULSE"));
+    btnSt = NO_PULSE;
+  }
+  else if(strcmp(buffer,"s") == 0)
+  {
+    Serial.println(F("Button press set to SHORT_PULSE"));
+    btnSt = SHORT_PULSE;
+  }
+  else if(strcmp(buffer,"l") == 0)
+  {
+    Serial.println(F("Button press set to LONG_PULSE"));
+    btnSt = LONG_PULSE;
+  }
   else
   {
     valveTemp = atoi(buffer);
@@ -833,30 +854,36 @@ void checkResetTime()
 ButtonStatus readButton()
 {
   ButtonStatus res = NO_PULSE;
-  if(!digitalRead(BUTTON_PIN))
-  {
-    unsigned long time = millis();
-    delay(10);
-    while(!digitalRead(BUTTON_PIN) && millis() - time < BUTTON_LONG_PRESSED_TIME)
-    {
-      #if !DISABLE_WATCHDOGS
-        resetWatchdogs();
-      #endif
-    }
 
-    time = millis() - time;
+  #if MOCK_SENSORS
+    res = btnSt;
+  #else
+    if(!digitalRead(BUTTON_PIN))
+    {
+      unsigned long time = millis();
+      delay(10);
+      while(!digitalRead(BUTTON_PIN) && millis() - time < BUTTON_LONG_PRESSED_TIME)
+      {
+        #if !DISABLE_WATCHDOGS
+          resetWatchdogs();
+        #endif
+      }
 
-    if(time >= BUTTON_LONG_PRESSED_TIME)
-    {
-      debug(F("Long press detected: ")); debugln(time);
-      res = LONG_PULSE;
+      time = millis() - time;
+
+      if(time >= BUTTON_LONG_PRESSED_TIME)
+      {
+        debug(F("Long press detected: ")); debugln(time);
+        res = LONG_PULSE;
+      }
+      else if (time >= BUTTON_SHORT_PRESSED_MIN_TIME)
+      {
+        debug(F("Short press detected: ")); debugln(time);
+        res = SHORT_PULSE;
+      }
     }
-    else if (time >= BUTTON_SHORT_PRESSED_MIN_TIME)
-    {
-      debug(F("Short press detected: ")); debugln(time);
-      res = SHORT_PULSE;
-    }
-  }
+  #endif
+
   return res;
 }
 #endif
