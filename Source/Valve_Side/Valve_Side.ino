@@ -156,7 +156,7 @@ void printErrorData(bool printAll = false)
     EEPROM.get(errorDataAddress(i), data);
     if(strcmp(data.magic,EEPROM_ERROR_MAGIC_STR) == 0)
     {
-      if(data.flag>0)
+      if(data.flag>0 || printAll)
       {
         Serial.print(F("Number of errors of type ")); Serial.print(getErrorName((ErrorCode)i)); Serial.print(F(": ")); Serial.println(data.flag);
         for(uint8_t errorMsg = 0; errorMsg < MAX_NUM_OF_ERRORS && (errorMsg < data.flag || printAll); errorMsg++)
