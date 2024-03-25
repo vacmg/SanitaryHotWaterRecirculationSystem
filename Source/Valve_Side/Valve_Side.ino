@@ -13,7 +13,7 @@
 #endif
 
 
-#define MAIN_HELP_STRING "\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' to reset all registers to default and reboot"
+#define MAIN_HELP_STRING "\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to reset all registers to default and reboot"
 #define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as valve temp\n"
 
 
@@ -156,11 +156,14 @@ void printErrorData(bool printAll = false)
     EEPROM.get(errorDataAddress(i), data);
     if(strcmp(data.magic,EEPROM_ERROR_MAGIC_STR) == 0)
     {
-      Serial.print(F("Number of errors of type ")); Serial.print(getErrorName((ErrorCode)i)); Serial.print(F(": ")); Serial.println(data.flag);
-      for(uint8_t errorMsg = 0; errorMsg < MAX_NUM_OF_ERRORS && (errorMsg < data.flag || printAll); errorMsg++)
+      if(data.flag>0)
       {
-        Serial.print(getErrorName((ErrorCode)i)); Serial.print(F("[")); Serial.print(errorMsg+1); Serial.print(F("]:\t"));
-        Serial.println((errorMsg < data.flag)?data.message[errorMsg]:"OK");
+        Serial.print(F("Number of errors of type ")); Serial.print(getErrorName((ErrorCode)i)); Serial.print(F(": ")); Serial.println(data.flag);
+        for(uint8_t errorMsg = 0; errorMsg < MAX_NUM_OF_ERRORS && (errorMsg < data.flag || printAll); errorMsg++)
+        {
+          Serial.print(getErrorName((ErrorCode)i)); Serial.print(F("[")); Serial.print(errorMsg+1); Serial.print(F("]:\t"));
+          Serial.println((errorMsg < data.flag)?data.message[errorMsg]:"OK");
+        }
       }
     }
     else
@@ -286,13 +289,28 @@ void updateColorToProgress(uint8_t progress)
 }
 
 
-char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors = true)
+char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors = true, bool silenceDebug = false)
 {
-  debug(requestAndBuffer); debugln(F(" request sent"));
-
-  while(rs485.available())
+  if(!silenceDebug)
   {
-    rs485.read(); // discard buffer
+    debug(F("Request sent: ")); debugln(requestAndBuffer);
+  }
+
+  if(silenceDebug)
+  {
+    while(rs485.available())
+    {
+      rs485.read(); // discard buffer
+    }
+  }
+  else
+  {
+    debugln(F("---"));
+    while(rs485.available())
+    {
+      Serial.write(rs485.read()); // print buffer
+    }
+    debugln(F("---"));
   }
 
   rs485.print(requestAndBuffer);
@@ -302,6 +320,10 @@ char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors 
   {
     size_t dataSize = rs485.readBytesUntil('$', requestAndBuffer, MAX_COMMAND_LENGTH-1);
     requestAndBuffer[dataSize] = '\0';
+    if(!silenceDebug)
+    {
+      debug(F("Request answer: ")); debugln(requestAndBuffer);
+    }
     return requestAndBuffer;
   }
   else 
@@ -311,7 +333,7 @@ char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors 
     {
       error(ERROR_RS485_NO_RESPONSE, errorStrBuff);
     }
-    else
+    else if(!silenceDebug)
     {
       debugln(errorStrBuff);
     }
@@ -327,11 +349,7 @@ void startPump()
   sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
   if(sendRequest(buffer,PUMP_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
   {
-    if(strcmp(buffer,OKCMD)==0)
-    {
-      debugln(F("PUMP CMD RESULT: OK"));
-    }
-    else 
+    if(strcmp(buffer,OKCMD)!=0)
     {
       sprintf(errorStrBuff, "Expected 'OK';\tReceived '%s'", buffer);
       error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
@@ -346,11 +364,7 @@ void stopPump()
   sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
   if(sendRequest(buffer,PUMP_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
   {
-    if(strcmp(buffer,OKCMD)==0)
-    {
-      debugln(F("PUMP CMD RESULT: OK"));
-    }
-    else 
+    if(strcmp(buffer,OKCMD)!=0)
     {
       sprintf(errorStrBuff, "Expected 'OK';\tReceived '%s'", buffer);
       error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
@@ -534,17 +548,10 @@ bool getValveTempIfNecessary()
 
 void getHeaterTemp(bool ignoreErrors = false)
 {
-  resetWatchdogs();
-
   char buffer[17];
   sprintf(buffer,"%s%s$",HEADER,tempCMD);
-  if(sendRequest(buffer,TEMP_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
+  if(sendRequest(buffer,TEMP_MESSAGE_PROCESSING_MULTIPLIER,!ignoreErrors, ignoreErrors) != nullptr)
   {
-    if(!ignoreErrors)
-    {
-      debugln(F("HEATER TEMP REQUEST CMD SENT"));
-    }
-
     if(strcmp(buffer, tempCMD) == 0)
     {
       size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
@@ -734,6 +741,13 @@ void serialEvent()
     EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, false);
     error(NO_ERROR, F("Rebooting to complete reset"));
   }
+  else if(strcmp(buffer,"reseton") == 0)
+  {
+    invalidateErrorData();
+    EEPROM.put(ENABLE_REGISTER_ADDRESS, true);
+    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, false);
+    error(NO_ERROR, F("Rebooting to complete reset"));
+  }
   
 
   #if MOCK_SENSORS
@@ -792,8 +806,11 @@ void resetWatchdogs()
   #if DEBUGWATCHDOG
     debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
   #endif
-
+  #if DEBUGWATCHDOG
   if(sendRequest(buffer,WDT_RST_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
+  #else
+  if(sendRequest(buffer,WDT_RST_MESSAGE_PROCESSING_MULTIPLIER,true,true) != nullptr)
+  #endif
   {
     if(strcmp(buffer,OKCMD)!=0)
     {
@@ -887,7 +904,7 @@ void connectToHeater(bool ignoreErrors = false)
   }
   else
   {
-    debug(F("Connected to heater MCU in ")); debugln(formattedTime(millis() - watchdogsPMillis,buff));
+    debug(F("Connected to heater MCU in ")); debugln(formattedTime(millis() - connectionPMillis, buff));
   }
   wdt_reset();
   delay(1500);
@@ -1087,8 +1104,6 @@ void loop()
 
         if(isTriggerActive())
         {
-          resetWatchdogs();
-
           startPump();
 
           heaterTempPMillis = 0; // Set millis timers
@@ -1122,8 +1137,6 @@ void loop()
 
           if(valveTemp >= desiredTemp) // compare temps & change phase
           {
-            resetWatchdogs();
-
             stopPump();
 
             heaterTempPMillis = 0; // Set millis timers
