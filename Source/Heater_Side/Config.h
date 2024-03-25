@@ -20,7 +20,7 @@
 #define COLOR_PROGRESS_FEEDBACK 1
 
 #define ERROR_REGISTER_ADDRESS 0
-#define EEPROM_USED_SIZE 800
+#define EEPROM_USED_SIZE 1020
 #define EEPROM_ERROR_MAGIC_STR "V1"
 
 #define ENABLE_REGISTER_ADDRESS ERROR_REGISTER_ADDRESS + EEPROM_USED_SIZE + 1
@@ -39,6 +39,8 @@ const float MIN_ALLOWED_TEMP = 0; // 0ºC
 const float MAX_ALLOWED_TEMP = 60; // 60ºc
 const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
 const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
+
+const uint8_t MAX_NUM_OF_ERRORS = 3;
 
 const int MAX_PROGRESS_VALUE = 200; // [0-255]
 const long SYSTEM_RESET_PERIOD = 86400000; // 24 h
@@ -85,9 +87,7 @@ const char WTDRSTCMD[] = "WTD_RST";
 
 void rebootLoop()
 {
-  #if DISABLE_WATCHDOGS
-    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
-  #endif
+  wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
 
   while (1) 
   {
