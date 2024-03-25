@@ -63,7 +63,7 @@ const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich 
 
 const double PRESSURE_SENSOR_MIN_BAR = 0.0;
 const double PRESSURE_SENSOR_MAX_BAR = 10.0;
-const double WATER_MIN_NORMAL_PRESSURE_BAR = 3.0;
+const double WATER_MIN_NORMAL_PRESSURE_BAR = 2.75;
 const double PRESSURE_SENSOR_CURRENT_MIN_mA = 3.6;
 const double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
 
@@ -73,6 +73,7 @@ const int TEMP_MESSAGE_PROCESSING_MULTIPLIER = 15;
 const int WDT_RST_MESSAGE_PROCESSING_MULTIPLIER = 2;
 
 // Command structure: "SHWRS_{CMD$}[ARG$]*"
+const uint8_t MAX_COMMAND_LENGTH = 17;
 char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages
 const char pumpCMD[] = "PUMP";
 const char tempCMD[] = "TEMP";

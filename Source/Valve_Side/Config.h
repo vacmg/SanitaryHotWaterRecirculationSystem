@@ -73,6 +73,7 @@ const int TEMP_MESSAGE_PROCESSING_MULTIPLIER = 15;
 const int WDT_RST_MESSAGE_PROCESSING_MULTIPLIER = 2;
 
 // Command structure: "SHWRS_{CMD$}[ARG$]*"
+const uint8_t MAX_COMMAND_LENGTH = 17;
 char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages
 const char pumpCMD[] = "PUMP";
 const char tempCMD[] = "TEMP";

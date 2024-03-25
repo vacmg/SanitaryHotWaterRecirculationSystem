@@ -286,33 +286,50 @@ void updateColorToProgress(uint8_t progress)
 }
 
 
+char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors = true)
+{
+  debug(requestAndBuffer); debugln(F(" request sent"));
+  rs485.print(requestAndBuffer);
+  delay(delayMultiplier*RECEIVED_MESSAGE_TIMEOUT);
+
+  if(rs485.available() && rs485.find(HEADER))
+  {
+    size_t dataSize = rs485.readBytesUntil('$', requestAndBuffer, MAX_COMMAND_LENGTH-1);
+    requestAndBuffer[dataSize] = '\0';
+    return requestAndBuffer;
+  }
+  else 
+  {
+    sprintf(errorStrBuff, "Timeout receiving answer to command: %s", requestAndBuffer);
+    if(raiseErrors)
+    {
+      error(ERROR_RS485_NO_RESPONSE, errorStrBuff);
+    }
+    else
+    {
+      debugln(errorStrBuff);
+    }
+    
+    return nullptr;
+  }
+}
+
+
 void startPump()
 {
   char buffer[17];
   sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
-  rs485.print(buffer);
-  debugln(F("PUMP ON CMD SENT"));
-  delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-  if(rs485.available() && rs485.find(HEADER))
+  if(sendRequest(buffer,PUMP_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
   {
-    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-    buffer[dataSize] = '\0';
-
     if(strcmp(buffer,OKCMD)==0)
     {
       debugln(F("PUMP CMD RESULT: OK"));
     }
     else 
     {
-      char message[64];
-      sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+      sprintf(errorStrBuff, "Expected 'OK';\tReceived '%s'", buffer);
       error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
     }
-  }
-  else 
-  {
-    error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
   }
 }
 
@@ -321,29 +338,17 @@ void stopPump()
 {
   char buffer[17];
   sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
-  rs485.print(buffer);
-  debugln(F("PUMP OFF CMD SENT"));
-  delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-  if(rs485.available() && rs485.find(HEADER))
+  if(sendRequest(buffer,PUMP_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
   {
-    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-    buffer[dataSize] = '\0';
-
     if(strcmp(buffer,OKCMD)==0)
     {
       debugln(F("PUMP CMD RESULT: OK"));
     }
     else 
     {
-      char message[64];
-      sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
+      sprintf(errorStrBuff, "Expected 'OK';\tReceived '%s'", buffer);
       error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
     }
-  }
-  else 
-  {
-    error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
   }
 }
 
@@ -422,29 +427,23 @@ void error(ErrorCode err, const __FlashStringHelper* message)
 {
   char buff[ERROR_MESSAGE_SIZE];
 
-  PGM_P p = reinterpret_cast<PGM_P>(message);
   strncpy_F(buff,message,ERROR_MESSAGE_SIZE);
 
   error(err, buff, 1);
 }
 
-const char* statusToString(Status status)
 
 const __FlashStringHelper* statusToString(Status status)
 {
   switch (status) 
   {
     case MinimalWorkingState:
-      return "MinimalWorkingState";
       return F("MinimalWorkingState");
     case WaitingCold:
-      return "WaitingCold";
       return F("WaitingCold");
     case DrivingWater:
-      return "DrivingWater";
       return F("DrivingWater");
     case ServingWater:
-      return "ServingWater";
       return F("ServingWater");
   }
 }
@@ -533,19 +532,12 @@ void getHeaterTemp(bool ignoreErrors = false)
 
   char buffer[17];
   sprintf(buffer,"%s%s$",HEADER,tempCMD);
-  rs485.print(buffer);
-  if(!ignoreErrors)
+  if(sendRequest(buffer,TEMP_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
   {
-    debugln(F("HEATER TEMP REQUEST CMD SENT"));
-  }
-  
-
-  delay(TEMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-  if(rs485.available() && rs485.find(HEADER))
-  {
-    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-    buffer[dataSize] = '\0';
+    if(!ignoreErrors)
+    {
+      debugln(F("HEATER TEMP REQUEST CMD SENT"));
+    }
 
     if(strcmp(buffer, tempCMD) == 0)
     {
@@ -583,13 +575,6 @@ void getHeaterTemp(bool ignoreErrors = false)
         sprintf(errorStrBuff,"Expected 'TEMP';\tReceived '%s'",buffer);
         error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
       }
-    }
-  }
-  else 
-  {
-    if(!ignoreErrors)
-    {
-      error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving TEMP CMD ANSWER"));
     }
   }
 }
@@ -799,18 +784,11 @@ void resetWatchdogs()
   sprintf(buffer,"%s%s$",HEADER,WTDRSTCMD);
 
   #if DEBUGWATCHDOG
-  debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
+    debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
   #endif
 
-  rs485.print(buffer);
-
-  delay(WDT_RST_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-  if(rs485.available() && rs485.find(HEADER))
+  if(sendRequest(buffer,WDT_RST_MESSAGE_PROCESSING_MULTIPLIER) != nullptr)
   {
-    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-    buffer[dataSize] = '\0';
-
     if(strcmp(buffer,OKCMD)!=0)
     {
       sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
@@ -822,10 +800,6 @@ void resetWatchdogs()
       debugln(F("WTD_RST CMD RESULT: OK"));
     }
     #endif
-  }
-  else if (SYSTEM_ENABLED)
-  {
-    error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving WTD_RST CMD ANSWER"));
   }
 }
 
@@ -843,6 +817,7 @@ void connectToHeater(bool ignoreErrors = false)
   long timeout = (SYSTEM_ENABLED?INIT_CONNECTION_TIMEOUT:INIT_CONNECTION_TIMEOUT_IF_DISABLED);
 
   char buff[32];
+  sprintf(buffer,"%s%s$",HEADER,WTDRSTCMD);
   debug(F("Connecting to heater MCU... Max time: ")); debugln(formattedTime(timeout,buff));
 
   while(!connected && (millis() - connectionPMillis) < timeout)
@@ -856,8 +831,6 @@ void connectToHeater(bool ignoreErrors = false)
     {
       wdt_reset();
       watchdogsPMillis = millis();
-
-      sprintf(buffer,"%s%s$",HEADER,WTDRSTCMD);
 
       #if DEBUGWATCHDOG
       debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
@@ -1102,7 +1075,6 @@ void loop()
 {
   if(SYSTEM_ENABLED)
   {
-    char buffer[17];
     switch(status)
     {
       case WaitingCold:
@@ -1111,45 +1083,21 @@ void loop()
         {
           resetWatchdogs();
 
-          sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
-          rs485.print(buffer);
-          debugln(F("PUMP ON CMD SENT"));
-          delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+          startPump();
 
-          if(rs485.available() && rs485.find(HEADER))
+          heaterTempPMillis = 0; // Set millis timers
+          valveTempPMillis = 0;
+          changeStatus(DrivingWater);
+          valveTemp = getValveTemp();
+          fadeMinTemp = valveTemp - FADE_MIN_TEMP_OFFSET;
+          for(uint8_t i = 0; i<6;i++)
           {
-            size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-            buffer[dataSize] = '\0';
-
-            if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
-            {
-              debugln(F("PUMP CMD RESULT: OK"));
-
-              heaterTempPMillis = 0; // Set millis timers
-              valveTempPMillis = 0;
-              changeStatus(DrivingWater);
-              valveTemp = getValveTemp();
-              fadeMinTemp = valveTemp - FADE_MIN_TEMP_OFFSET;
-              for(uint8_t i = 0; i<6;i++)
-              {
-                delay(1000);
-                #if !DISABLE_WATCHDOGS
-                  resetWatchdogsIfNecessary();
-                #endif
-              }
-              getHeaterTemp();
-            }
-            else 
-            {
-              char message[64];
-              sprintf(message,"Expected 'OK';\tReceived '%s'",buffer);
-              error(ERROR_RS485_UNEXPECTED_MESSAGE, buffer);
-            }
+            delay(1000);
+            #if !DISABLE_WATCHDOGS
+              resetWatchdogsIfNecessary();
+            #endif
           }
-          else 
-          {
-            error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
-          }
+          getHeaterTemp();
         }
 
       break;
@@ -1165,42 +1113,18 @@ void loop()
           #if COLOR_PROGRESS_FEEDBACK
             updateColorToProgress(progress);
           #endif
+
           if(valveTemp >= desiredTemp) // compare temps & change phase
           {
             resetWatchdogs();
 
-            sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
-            rs485.print(buffer);
-            debugln(F("PUMP OFF CMD SENT"));
-            delay(PUMP_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+            stopPump();
 
-            if(rs485.available() && rs485.find(HEADER))
-            {
-              size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-              buffer[dataSize] = '\0';
-
-              if(strcmp(buffer,OKCMD)==0) // Transition to DrivingWater code
-              {
-                debugln(F("PUMP CMD RESULT: OK"));
-
-                heaterTempPMillis = 0; // Set millis timers
-                valveTempPMillis = 0;
-                changeStatus(DrivingWater);
-              }
-              else 
-              {
-                sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
-                error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
-              }
-            }
-            else 
-            {
-              error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving PUMP CMD ANSWER"));
-            }
-
+            heaterTempPMillis = 0; // Set millis timers
+            valveTempPMillis = 0;
             digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
             changeStatus(ServingWater);
-            getHeaterTempIfNecessary();
+            getHeaterTemp();
           }
         }
         
@@ -1256,14 +1180,14 @@ void loop()
       debug(F("Changing MINIMAL_WORKING_STATE_ENABLED from ")); debug(MINIMAL_WORKING_STATE_ENABLED);debug(F(" to ")); debugln(!MINIMAL_WORKING_STATE_ENABLED);
       EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
       writeColor(USER_ACK_COLOR);
-      error(NO_ERROR, F("Rebooting to apply new Minimal Working State"));
+      error(NO_ERROR, MINIMAL_WORKING_STATE_ENABLED?F("Rebooting to set Minimal Working State"):F("Rebooting to clear Minimal Working State"));
       
       break;
     case LONG_PULSE:
       debug(F("Changing SYSTEM_ENABLED from ")); debug(SYSTEM_ENABLED);debug(F(" to ")); debugln(!SYSTEM_ENABLED);
       EEPROM.put(ENABLE_REGISTER_ADDRESS, !SYSTEM_ENABLED);
       writeColor(USER_ACK_COLOR);
-      error(NO_ERROR, F("Rebooting to apply new System Enable State"));
+      error(NO_ERROR, SYSTEM_ENABLED?F("Rebooting to disable the system"):F("Rebooting to enable the system"));
       break;
   }
   #endif
