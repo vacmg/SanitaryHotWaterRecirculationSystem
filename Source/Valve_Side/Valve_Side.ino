@@ -12,6 +12,11 @@
 #include <DallasTemperature.h>
 #endif
 
+
+#define MAIN_HELP_STRING "\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' to reset all registers to default and reboot"
+#define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as valve temp\n"
+
+
 const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
 const uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
 const uint8_t RX_PIN = 6; // Serial data in pin
@@ -599,9 +604,9 @@ void serialEvent()
 
   if(strcmp(buffer,"help") == 0)
   {
-    Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
+    Serial.println(F(MAIN_HELP_STRING));
     #if MOCK_SENSORS
-      Serial.println(F("\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
+      Serial.println(F(MOCK_SENSORS_HELP_STRING));
     #endif
   }
   else if(strcmp(buffer,"clear") == 0)
@@ -951,9 +956,9 @@ void setup()
   #if MOCK_SENSORS
     Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
   #endif
-  Serial.println(F("\nType 'enable' or 'disable' to enable or disable the system;\n'setminimal' or 'clearminimal' to set or clear the minimal mode (valve bypass);\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n"));
+  Serial.println(F(MAIN_HELP_STRING));
   #if MOCK_SENSORS
-    Serial.println(F("\nPress e or d to enable or disable trigger\nsend a number to incorporate it as valve temp\n"));
+    Serial.println(F(MOCK_SENSORS_HELP_STRING));
   #endif
     
   delay(1000);
