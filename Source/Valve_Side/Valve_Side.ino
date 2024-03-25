@@ -575,14 +575,22 @@ const char* formattedTime(long time, char* buff)
 }
 
 
-void printSensorsInfo()
+void printSystemInfo()
 {
   char buff[64];
-  Serial.println(F("\n-----------------------------------------"  ));
-  Serial.println(F(  "Sensor list:\n"));
   Serial.print(F(    "Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - millis(), buff));
   Serial.print(F(    "System Enabled: ")); Serial.println(SYSTEM_ENABLED?"True":"False");
   Serial.print(F(    "Minimal Working State Enabled: ")); Serial.println(MINIMAL_WORKING_STATE_ENABLED?"True":"False");
+  Serial.print(F(    "Error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
+  Serial.print(F(    "Status: ")); Serial.println(statusToString(status));
+}
+
+
+void printSensorsInfo()
+{
+  Serial.println(F("\n-----------------------------------------"  ));
+  printSystemInfo();
+  Serial.println(F(  "Sensor list:\n"));
   #if MOCK_SENSORS
     Serial.println(F("Valve pressure sensor: MOCKED"));
     Serial.print(F(  "Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp);Serial.println(F("ºC"));
@@ -636,12 +644,12 @@ void serialEvent()
   }
   else if(strcmp(buffer,"setminimal") == 0)
   {
-    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
+    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, true);
     error(NO_ERROR, F("Rebooting to enable the minimal mode"));
   }
   else if(strcmp(buffer,"clearminimal") == 0)
   {
-    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, !MINIMAL_WORKING_STATE_ENABLED);
+    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, false);
     error(NO_ERROR, F("Rebooting to disable the minimal mode"));
   }
   else if(strcmp(buffer,"sensors") == 0)
@@ -663,6 +671,13 @@ void serialEvent()
   else if(strcmp(buffer,"closevalve") == 0)
   {
     digitalWrite(VALVE_RELAY_PIN, RELAY_DISABLED);
+  }
+  else if(strcmp(buffer,"reset") == 0)
+  {
+    invalidateErrorData();
+    EEPROM.put(ENABLE_REGISTER_ADDRESS, false);
+    EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, false);
+    error(NO_ERROR, F("Rebooting to complete reset"));
   }
   
 
@@ -823,7 +838,7 @@ void connectToHeater(bool ignoreErrors = false)
   {
     debug(F("Connected to heater MCU in ")); debugln(formattedTime(millis() - watchdogsPMillis,buff));
   }
-
+  wdt_reset();
   delay(1500);
 
   #endif
@@ -942,6 +957,8 @@ void setup()
   Serial.println(F(  "------------------------------------------\n"));
   wdt_reset();
 
+  printSystemInfo();
+
   printErrorData();
 
   Serial.println(F("Starting..."));
@@ -972,6 +989,7 @@ void setup()
     Serial.println(F("\n------------- SYSTEM ENABLED -------------\n"  ));
     connectToHeater();
   }
+  
 
   wdt_reset();
   Serial.println(F("Start completed"));
