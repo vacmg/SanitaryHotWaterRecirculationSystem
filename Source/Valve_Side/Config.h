@@ -63,7 +63,7 @@ const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich 
 
 const double PRESSURE_SENSOR_MIN_BAR = 0.0;
 const double PRESSURE_SENSOR_MAX_BAR = 10.0;
-const double WATER_MIN_NORMAL_PRESSURE_BAR = 3.0;
+const double WATER_MIN_NORMAL_PRESSURE_BAR = 2.75;
 const double PRESSURE_SENSOR_CURRENT_MIN_mA = 3.6;
 const double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
 

@@ -519,6 +519,8 @@ bool getValveTempIfNecessary()
 
 void getHeaterTemp(bool ignoreErrors = false)
 {
+  resetWatchdogs();
+
   char buffer[17];
   sprintf(buffer,"%s%s$",HEADER,tempCMD);
   rs485.print(buffer);
@@ -768,47 +770,55 @@ void serialEvent()
 }
 
 #if !DISABLE_WATCHDOGS
+void resetWatchdogsIfNecessary()
+{
+  if(millis() - watchdogsPMillis > WATCHDOG_RESET_PERIOD) // Reset both watchdogs once in a WATCHDOG_RESET_PERIOD
+  {
+    resetWatchdogs();
+  }
+}
+
+
 void resetWatchdogs()
 {
   char buffer[17];
-  if(millis() - watchdogsPMillis > WATCHDOG_RESET_PERIOD) // Reset both watchdogs once in a WATCHDOG_RESET_PERIOD
+  
+  wdt_reset();
+  watchdogsPMillis = millis();
+
+  sprintf(buffer,"%s%s$",HEADER,WTDRSTCMD);
+
+  #if DEBUGWATCHDOG
+  debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
+  #endif
+
+  rs485.print(buffer);
+
+  delay(WDT_RST_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+
+  if(rs485.available() && rs485.find(HEADER))
   {
-    wdt_reset();
-    watchdogsPMillis = millis();
+    size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
+    buffer[dataSize] = '\0';
 
-    sprintf(buffer,"%s%s$",HEADER,WTDRSTCMD);
-
+    if(strcmp(buffer,OKCMD)!=0)
+    {
+      sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
+      error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+    }
     #if DEBUGWATCHDOG
-    debug(F("Sending Watchdog Reset CMD: ")); debugln(buffer);
+    else 
+    {
+      debugln(F("WTD_RST CMD RESULT: OK"));
+    }
     #endif
-
-    rs485.print(buffer);
-
-    delay(WDT_RST_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
-
-    if(rs485.available() && rs485.find(HEADER))
-    {
-      size_t dataSize = rs485.readBytesUntil('$', buffer, 16);
-      buffer[dataSize] = '\0';
-
-      if(strcmp(buffer,OKCMD)!=0)
-      {
-        sprintf(errorStrBuff,"Expected 'OK';\tReceived '%s'",buffer);
-        error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
-      }
-      #if DEBUGWATCHDOG
-      else 
-      {
-        debugln(F("WTD_RST CMD RESULT: OK"));
-      }
-      #endif
-    }
-    else if (SYSTEM_ENABLED)
-    {
-      error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving WTD_RST CMD ANSWER"));
-    }
+  }
+  else if (SYSTEM_ENABLED)
+  {
+    error(ERROR_RS485_NO_RESPONSE, F("Timeout receiving WTD_RST CMD ANSWER"));
   }
 }
+
 #endif
 
 
@@ -932,7 +942,7 @@ ButtonStatus readButton()
       while(!digitalRead(BUTTON_PIN) && millis() - time < BUTTON_LONG_PRESSED_TIME)
       {
         #if !DISABLE_WATCHDOGS
-          resetWatchdogs();
+          resetWatchdogsIfNecessary();
         #endif
       }
 
@@ -1089,6 +1099,8 @@ void loop()
 
         if(isTriggerActive())
         {
+          resetWatchdogs();
+
           sprintf(buffer,"%s%s$1$",HEADER,pumpCMD);
           rs485.print(buffer);
           debugln(F("PUMP ON CMD SENT"));
@@ -1112,7 +1124,7 @@ void loop()
               {
                 delay(1000);
                 #if !DISABLE_WATCHDOGS
-                  resetWatchdogs();
+                  resetWatchdogsIfNecessary();
                 #endif
               }
               getHeaterTemp();
@@ -1139,12 +1151,14 @@ void loop()
         if(getValveTempIfNecessary())
         {
           long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, MAX_PROGRESS_VALUE);
-          debug(F("valveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tfadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F(" (")); debug(progress); debugln(F(")"));
+          debug(F("fadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F(" (")); debug(progress); debugln(F(")"));
           #if COLOR_PROGRESS_FEEDBACK
             updateColorToProgress(progress);
           #endif
           if(valveTemp >= desiredTemp) // compare temps & change phase
           {
+            resetWatchdogs();
+
             sprintf(buffer,"%s%s$0$",HEADER,pumpCMD);
             rs485.print(buffer);
             debugln(F("PUMP OFF CMD SENT"));
@@ -1245,7 +1259,7 @@ void loop()
   #endif
 
   #if !DISABLE_WATCHDOGS
-  resetWatchdogs();
+  resetWatchdogsIfNecessary();
   checkResetTime();
   #endif
 }
