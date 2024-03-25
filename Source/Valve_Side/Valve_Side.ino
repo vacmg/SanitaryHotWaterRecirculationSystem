@@ -54,9 +54,9 @@ MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Creat
 typedef enum {MinimalWorkingState, WaitingCold, DrivingWater, ServingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(status)); status = newStatus; writeColor(statusToColor(status)); debug(F(" to ")); debugln(statusToString(status));} while(0)
 
-typedef enum {NO_ERROR = 0, ERROR_INTERNAL, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
+typedef enum {NO_ERROR = 0, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_CONNECTION_NOT_ESTABLISHED, ERROR_RS485_NO_RESPONSE, ERROR_RS485_UNEXPECTED_MESSAGE,              ENUM_LEN} ErrorCode;
 #define NUM_OF_ERROR_TYPES ErrorCode::ENUM_LEN
-#define ERROR_MESSAGE_SIZE (EEPROM_USED_SIZE-((sizeof(char)*3)*NUM_OF_ERROR_TYPES)-(NUM_OF_ERROR_TYPES * sizeof(bool)))/(NUM_OF_ERROR_TYPES)
+#define ERROR_MESSAGE_SIZE ((EEPROM_USED_SIZE-((sizeof(MAX_NUM_OF_ERRORS)+sizeof(EEPROM_ERROR_MAGIC_STR))*NUM_OF_ERROR_TYPES))/(NUM_OF_ERROR_TYPES*MAX_NUM_OF_ERRORS))
 #define errorDataAddress(errorCode) (ERROR_REGISTER_ADDRESS + (sizeof(ErrorData) * errorCode))
 
 typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
@@ -76,8 +76,8 @@ typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 
 typedef struct 
 {
-  bool flag;
-  char message[ERROR_MESSAGE_SIZE];
+  uint8_t flag;
+  char message[MAX_NUM_OF_ERRORS][ERROR_MESSAGE_SIZE];
   char magic[sizeof(EEPROM_ERROR_MAGIC_STR)];
 } 
 ErrorData;
@@ -114,8 +114,6 @@ const char* getErrorName(ErrorCode error)
   {
     case NO_ERROR:
       return "NO_ERROR";
-    case ERROR_INTERNAL:
-      return "ERROR_INTERNAL";
     case ERROR_TEMP_SENSOR_INVALID_VALUE:
       return "ERROR_TEMP_SENSOR_INVALID_VALUE";
     case ERROR_PRESSURE_SENSOR_INVALID_VALUE:
@@ -143,17 +141,56 @@ void printErrorData(bool printAll = false)
     EEPROM.get(errorDataAddress(i), data);
     if(strcmp(data.magic,EEPROM_ERROR_MAGIC_STR) == 0)
     {
-      if(printAll || data.flag)
+      Serial.print(F("Number of errors of type ")); Serial.print(getErrorName((ErrorCode)i)); Serial.print(F(": ")); Serial.println(data.flag);
+      for(uint8_t errorMsg = 0; errorMsg < MAX_NUM_OF_ERRORS && (errorMsg < data.flag || printAll); errorMsg++)
       {
-        Serial.print(getErrorName((ErrorCode)i)); Serial.print(F(":\t"));
-        Serial.println(data.flag?data.message:"OK");
+        Serial.print(getErrorName((ErrorCode)i)); Serial.print(F("[")); Serial.print(errorMsg+1); Serial.print(F("]:\t"));
+        Serial.println((errorMsg < data.flag)?data.message[errorMsg]:"OK");
       }
     }
     else
     {
       Serial.println(F("-----------------------------------------"));
-      Serial.print(F("ErrorData of error: "));Serial.print(getErrorName((ErrorCode)i)); Serial.println(F(" is not valid\nRestoring it...\t"));
+      Serial.print(F("ErrorData of error: "));Serial.print(getErrorName((ErrorCode)i)); Serial.println(F(" is not valid\nTrying to read the ErrorData anyways: "));
 
+      {
+        char buff[ERROR_MESSAGE_SIZE];
+        Serial.print(F("Magic: ")); 
+        memcpy(buff, data.magic, ERROR_MESSAGE_SIZE);
+        buff[ERROR_MESSAGE_SIZE-1] = '\0';
+        bool nullFound = false;
+        for(uint8_t i = 0; i<sizeof(EEPROM_ERROR_MAGIC_STR);i++)
+        {
+          Serial.write(buff[i]);
+          Serial.print(' ');
+          Serial.println(buff[i], DEC);
+          if(buff[i] == '\0')
+          {
+            nullFound = true;
+          }
+        }
+        if(nullFound)
+        {
+          Serial.println();
+        }
+        else
+        {
+          Serial.println(&buff[sizeof(EEPROM_ERROR_MAGIC_STR)]);
+        }
+
+        Serial.print(F("Flag: "));
+        Serial.println(data.flag);
+        Serial.println(F("Messages:"));
+        for(uint8_t errorMsg = 0; errorMsg < MAX_NUM_OF_ERRORS; errorMsg++)
+        {
+          Serial.print(getErrorName((ErrorCode)i)); Serial.print(F("[")); Serial.print(errorMsg+1); Serial.print(F("]:\t"));
+          memcpy(buff, data.message[errorMsg], ERROR_MESSAGE_SIZE);
+          buff[ERROR_MESSAGE_SIZE-1] = '\0';
+          Serial.println(buff);
+        }
+      }
+
+      Serial.println(F("\nRestoring it...\t"));
       memset(&data,'\0',sizeof(ErrorData));
       strcpy(data.magic,EEPROM_ERROR_MAGIC_STR);
 
@@ -306,17 +343,31 @@ void error(ErrorCode err, const char* message, bool printName)
   Serial.println(F("-----------------------------------------"));
   Serial.println(F("-----------------------------------------\n"));
 
+  ErrorData errorData;
+
   if(err != NO_ERROR)
   {
-    ErrorData errorData;
     EEPROM.get(errorDataAddress(err), errorData);
-    
-    errorData.flag = true;
-    strcpy(errorData.message, message);
 
-    #if !EEPROM_DONT_WRITE
-      EEPROM.put(errorDataAddress(err), errorData);
-    #endif
+    errorData.flag++;
+
+    if(errorData.flag<=MAX_NUM_OF_ERRORS)
+    {
+      strncpy(errorData.message[errorData.flag-1], message, ERROR_MESSAGE_SIZE);
+      errorData.message[errorData.flag][ERROR_MESSAGE_SIZE-1] = '\0';
+
+      debugln(F("Saving the following ErrorData:"));
+      debug(F("Magic: ")); debugln(errorData.magic);
+      debug(F("Flag: ")); debugln(errorData.flag);
+      for(uint8_t i = 0; i < MAX_NUM_OF_ERRORS; i++)
+      {
+        debug(F("Message[")); debug(i+1); debug(F("]: ")); debugln(errorData.message[i]);
+      }
+
+      #if !EEPROM_DONT_WRITE
+        EEPROM.put(errorDataAddress(err), errorData);
+      #endif
+    }
   }
 
   delay(3000);
@@ -332,7 +383,7 @@ void error(ErrorCode err, const char* message, bool printName)
 #endif
   {
   #if USE_BUTTON
-    if(err != NO_ERROR)
+    if(err != NO_ERROR && errorData.flag>=MAX_NUM_OF_ERRORS)
     {
       debug(F("Changing MINIMAL_WORKING_STATE_ENABLED from ")); debug(MINIMAL_WORKING_STATE_ENABLED);debug(F(" to ")); debugln(true);
       EEPROM.put(MINIMAL_WORKING_MODE_REGISTER_ADDRESS, true);
@@ -357,17 +408,18 @@ void error(ErrorCode err, const __FlashStringHelper* message)
   char buff[ERROR_MESSAGE_SIZE];
 
   PGM_P p = reinterpret_cast<PGM_P>(message);
-  unsigned int i = 0;
-  while (1) 
+  for (uint8_t i = 0; i<ERROR_MESSAGE_SIZE; i++) 
   {
     unsigned char c = pgm_read_byte(p++);
 
-    buff[i++] = c;
+    buff[i] = c;
     if (c == 0)
     {
       break;
     }
   }
+
+  buff[ERROR_MESSAGE_SIZE-1] = '\0';
 
   error(err, buff, 1);
 }
