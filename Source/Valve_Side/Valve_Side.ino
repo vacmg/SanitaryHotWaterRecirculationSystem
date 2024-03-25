@@ -316,15 +316,33 @@ char* sendRequest(char* requestAndBuffer, int delayMultiplier, bool raiseErrors 
   rs485.print(requestAndBuffer);
   delay(delayMultiplier*RECEIVED_MESSAGE_TIMEOUT);
 
-  if(rs485.available() && rs485.find(HEADER))
+  if(rs485.available())
   {
-    size_t dataSize = rs485.readBytesUntil('$', requestAndBuffer, MAX_COMMAND_LENGTH-1);
-    requestAndBuffer[dataSize] = '\0';
-    if(!silenceDebug)
+    if(rs485.find(HEADER))
     {
-      debug(F("Request answer: ")); debugln(requestAndBuffer);
+      size_t dataSize = rs485.readBytesUntil('$', requestAndBuffer, MAX_COMMAND_LENGTH-1);
+      requestAndBuffer[dataSize] = '\0';
+      if(!silenceDebug)
+      {
+        debug(F("Request answer: ")); debugln(requestAndBuffer);
+      }
+      return requestAndBuffer;
     }
-    return requestAndBuffer;
+    else 
+    {
+      sprintf(errorStrBuff, "Header not found in answer to command: %s", requestAndBuffer);
+      if(raiseErrors)
+      {
+        error(ERROR_RS485_UNEXPECTED_MESSAGE, errorStrBuff);
+      }
+      else if(!silenceDebug)
+      {
+        debugln(errorStrBuff);
+      }
+      
+      return nullptr;
+    }
+    
   }
   else 
   {
@@ -641,6 +659,7 @@ void printSystemInfo()
 {
   char buff[64];
   Serial.print(F(    "Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - millis(), buff));
+  Serial.print(F(    "Watchdogs reset period: ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
   Serial.print(F(    "System Enabled: ")); Serial.println(SYSTEM_ENABLED?"True":"False");
   Serial.print(F(    "Minimal Working State Enabled: ")); Serial.println(MINIMAL_WORKING_STATE_ENABLED?"True":"False");
   Serial.print(F(    "Error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
@@ -1038,14 +1057,14 @@ void setup()
   }
 
   rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
-  delay(1000);
 
   #if !MOCK_SENSORS
     analogReference(INTERNAL);
     tempSensor.begin();
-
     post();
   #endif
+
+  delay(1000);
     
   if(!SYSTEM_ENABLED)
   {
@@ -1131,7 +1150,7 @@ void loop()
         if(getValveTempIfNecessary())
         {
           long progress = map(valveTemp, fadeMinTemp, desiredTemp, 0, MAX_PROGRESS_VALUE);
-          debug(F("fadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F(" (")); debug(progress); debugln(F(")"));
+          debug(F("fadeMinTemp: ")); debug(fadeMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
           #if COLOR_PROGRESS_FEEDBACK
             updateColorToProgress(progress);
           #endif
@@ -1145,6 +1164,7 @@ void loop()
             digitalWrite(VALVE_RELAY_PIN, RELAY_ENABLED);
             changeStatus(ServingWater);
             getHeaterTemp();
+            delay(500);
           }
         }
         

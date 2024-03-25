@@ -45,7 +45,7 @@ const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
 const uint8_t MAX_NUM_OF_ERRORS = 3;
 
-const int WATCHDOG_RESET_PERIOD = 6000; // 6 s
+const int WATCHDOG_RESET_PERIOD = 5000; // 6 s
 const long SYSTEM_RESET_PERIOD = 86400000; // 24 h
 
 const int MAX_PROGRESS_VALUE = 200; // [0-255]
