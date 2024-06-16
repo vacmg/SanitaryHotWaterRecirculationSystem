@@ -19,8 +19,8 @@
 
 const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
 const uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
-const uint8_t RX_PIN = 6; // Serial data in pin
-const uint8_t TX_PIN = 3; // Serial data out pin
+// const uint8_t RX_PIN = 6; // Serial data in pin
+// const uint8_t TX_PIN = 3; // Serial data out pin
 
 const uint8_t VALVE_RELAY_PIN = 2;
 // const uint8_t VALVE_FEEDBACK_PIN = 7;
@@ -48,7 +48,7 @@ OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
 DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 #endif
 
-MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Create rs485 instance
+MAX_RS485 rs485(&Serial1, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Create rs485 instance
 
 
 typedef enum {MinimalWorkingState, WaitingCold, DrivingWater, ServingWater} Status;
@@ -1059,7 +1059,11 @@ void setup()
   rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
 
   #if !MOCK_SENSORS
-    analogReference(INTERNAL);
+    #ifdef __AVR_ATmega2560__
+      analogReference(INTERNAL1V1);
+    #else
+      analogReference(INTERNAL);
+    #endif
     tempSensor.begin();
     post();
   #endif

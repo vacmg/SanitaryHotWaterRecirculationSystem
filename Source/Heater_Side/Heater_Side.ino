@@ -13,8 +13,8 @@
 
 const uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
 const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
-const uint8_t RX_PIN = 11; // Serial data in pin
-const uint8_t TX_PIN = 8; // Serial data out pin
+// const uint8_t RX_PIN = 11; // Serial data in pin
+// const uint8_t TX_PIN = 8; // Serial data out pin
 const uint8_t pumpRelayPin = 7; // Pump relay pin
 
 #if !MOCK_SENSORS
@@ -25,7 +25,7 @@ OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
 DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 #endif
 
-MAX_RS485 rs485(RX_PIN, TX_PIN, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // module constructor
+MAX_RS485 rs485(&Serial1, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // module constructor
 
 char cmdBuffer[17] = "";
 bool pumpEnabled = false;
