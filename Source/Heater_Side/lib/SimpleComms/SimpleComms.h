@@ -8,7 +8,9 @@
 #include <StreamUtils.h>
 #include <Stream.h>
 
-#define SC_MAX_MESSAGE_SIZE 63 // Real message size is 64, but the last byte is reserved for the null terminator
+#ifndef SC_MAX_MESSAGE_SIZE
+    #define SC_MAX_MESSAGE_SIZE 63 // Real message size is 64, but the last byte is reserved for the null terminator
+#endif
 #ifndef SC_USE_HAMMING_7_4_CORRECTION_CODE
     #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0 // For best performance if Serial is used, set the mode to SERIAL7N1
 #endif

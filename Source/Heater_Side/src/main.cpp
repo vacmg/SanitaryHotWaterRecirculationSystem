@@ -25,6 +25,7 @@ SimpleComms comms(&rs485, HEADER);
 
 bool pumpEnabled = false;
 unsigned long pumpPMillis = 0;
+long autoDisablePumpTimeout = AUTO_DISABLE_PUMP_TIMEOUT;
 
 char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
 
@@ -97,23 +98,24 @@ void waitForValveConnection()
 
 void autoDisablePumpIfTimeout()
 {
-    if(pumpEnabled && millis() - pumpPMillis > AUTO_DISABLE_PUMP_TIMEOUT)
+    if(pumpEnabled && millis() - pumpPMillis > autoDisablePumpTimeout)
     {
         pumpEnabled = false;
         digitalWrite(pumpRelayPin,RELAY_DISABLED);
 
-        debug(F("ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = "));
-        debug(formattedTime(millis() - pumpPMillis, commsBuffer)); debug(F(" > Timeout = "));
-        debug(formattedTime(AUTO_DISABLE_PUMP_TIMEOUT, commsBuffer));debugln(F(")\nDISCONECTING IT..."));
+        char buff[32];
+        char buff2[32];
+        sprintf(commsBuffer, "ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = %s > Timeout = %s)\nDISCONNECTING IT...", formattedTime(static_cast<long>(millis() - pumpPMillis), buff), formattedTime(autoDisablePumpTimeout, buff2));
+        debugln(commsBuffer);
 
-        // TODO send error message to the other MCU
+        comms.sendCommand(ERRCMD, (const char**)&commsBuffer, 1);
 
         debugln(F("Rebooting both MCUs"));
         rebootLoop();
     }
 }
 
-void handleRS485Event()
+void handleCommsEvent()
 {
     if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
     {
@@ -142,15 +144,15 @@ void handleRS485Event()
                 {
                     pumpPMillis = millis();
                     pumpEnabled = true;
-                    digitalWrite(pumpRelayPin,RELAY_ENABLED);
+                    digitalWrite(pumpRelayPin, RELAY_ENABLED);
 
                     debug(F("Starting pump at millis() = ")); debugln(pumpPMillis);
-                    debug(F("Max pump on time: ")); debugln(formattedTime(AUTO_DISABLE_PUMP_TIMEOUT, commsBuffer));
+                    debug(F("Max pump on time: ")); debugln(formattedTime(autoDisablePumpTimeout, commsBuffer));
                 }
                 else
                 {
                     debug(F("Stopping pump at millis() = ")); debugln(millis());
-                    digitalWrite(pumpRelayPin,RELAY_DISABLED);
+                    digitalWrite(pumpRelayPin, RELAY_DISABLED);
 
                     if(pumpEnabled)
                     {
@@ -178,6 +180,28 @@ void handleRS485Event()
             comms.sendCommand(tempCMD, (const char**)&tempStr, 1);
 
         }
+        else if(strcmp(commsBuffer, setPumpTimeoutCMD) == 0)
+        {
+            debugln(F("DPT CMD PARSED"));
+
+            if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE))
+            {
+                autoDisablePumpTimeout = atoi(commsBuffer);
+                debug(F("New pump timeout: ")); debugln(autoDisablePumpTimeout);
+
+                debugln(F("Sending OK CMD"));
+                comms.sendCommand(OKCMD, nullptr, 0);
+            }
+            else
+            {
+                sprintf(commsBuffer, "ERROR: No argument found in DPT command");
+                debugln(commsBuffer);
+                comms.sendCommand(ERRCMD, reinterpret_cast<const char**>(commsBuffer), 0);
+
+                debugln(F("Rebooting both MCUs"));
+                rebootLoop();
+            }
+        }
         else
         {
             debug(F("WARNING: Unknown command: ")); debugln(commsBuffer);
@@ -190,8 +214,8 @@ void setup()
 {
     wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
     #if !DISABLE_WATCHDOGS
-    delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
-    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+        delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
+        wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
     #endif
 
     pinMode(pumpRelayPin,OUTPUT);
@@ -229,7 +253,7 @@ void setup()
 
 void loop()
 {
-    handleRS485Event();
+    handleCommsEvent();
     autoDisablePumpIfTimeout();
 
     delay(100);
