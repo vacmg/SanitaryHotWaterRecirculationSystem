@@ -20,18 +20,22 @@
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
-#define USE_BUTTON 1
-#define TEST_COLORS 0
-#define EEPROM_DONT_WRITE 0 // Only works for errors
 #define ENABLE_AUTO_RESTART 1
-#define COLOR_PROGRESS_FEEDBACK 1
+#define EEPROM_DONT_WRITE_ERRORS 0 // Only works for errors
+#define EEPROM_ERROR_MEMORY_ITEMS 5
+#define EEPROM_MODE_ADDRESS 0
+#define EEPROM_FALLBACK_MODE_ENABLED_ADDRESS 8
+#define EEPROM_ERROR_START_ADDRESS 16
+#define ERROR_MESSAGE_SIZE 128
 
-#define ERROR_REGISTER_ADDRESS 0
-#define EEPROM_USED_SIZE 1020
-#define EEPROM_ERROR_MAGIC_STR "V1"
+typedef enum {NO_ERROR = 0, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_COMMS_CONNECTION_NOT_ESTABLISHED, ERROR_COMMS_NO_RESPONSE, ERROR_COMMS_UNEXPECTED_MESSAGE, ERROR_HEATER_MCU_ERROR,             ENUM_LEN} ErrorCode;
+typedef struct
+{
+    bool activeError;
+    ErrorCode errorCode;
+    char message[ERROR_MESSAGE_SIZE];
+} EEPROMError;
 
-#define ENABLE_REGISTER_ADDRESS (ERROR_REGISTER_ADDRESS + EEPROM_USED_SIZE + 1)
-#define MINIMAL_WORKING_MODE_REGISTER_ADDRESS (ENABLE_REGISTER_ADDRESS + 1 + sizeof(SYSTEM_ENABLED))
 
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED
@@ -42,25 +46,27 @@
 #define BTN_PRESSED 1
 #define BTN_RELEASED !BTN_PRESSED
 
+#define SC_MAX_MESSAGE_SIZE 127 // Real message size is SC_MAX_MESSAGE_SIZE+1, but the last byte is reserved for the null terminator
+
+
 const uint32_t SERIAL_USB_BAUD_RATE = 115200;
 const uint32_t RS485_SERIAL_BAUD_RATE = 9600;
 
-const float MIN_ALLOWED_TEMP = 0; // 0ºC
-const float MAX_ALLOWED_TEMP = 60; // 60ºc
+const float MIN_ALLOWED_TEMP = 10; // 0ºC
+const float MAX_ALLOWED_TEMP = 67; // 67ºc
 const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
 const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
-
-const uint8_t MAX_NUM_OF_ERRORS = 3;
 
 const int WATCHDOG_RESET_PERIOD = 6000; // 6 s
 const long SYSTEM_RESET_PERIOD = 86400000; // 24 h
 
+const int MIN_PROGRESS_VALUE = 0; // [0-255]
 const int MAX_PROGRESS_VALUE = 200; // [0-255]
 const int ANIMATION_FRAME_DELAY = 2; // ms
 const int FADE_MIN_TEMP_OFFSET = 2;
 
 const long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
-const long INIT_CONNECTION_TIMEOUT_IF_DISABLED = 12000; // 12 sec
+const long INIT_CONNECTION_TIMEOUT_FALLBACK = 12000; // 12 sec
 const long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
 
 const int BUTTON_LONG_PRESSED_TIME = 2000; // 2 s
@@ -82,13 +88,14 @@ const int PUMP_MESSAGE_PROCESSING_MULTIPLIER = 2;
 const int TEMP_MESSAGE_PROCESSING_MULTIPLIER = 15;
 const int WDT_RST_MESSAGE_PROCESSING_MULTIPLIER = 2;
 
-// Command structure: "SHWRS_{CMD$}[ARG$]*"
-const uint8_t MAX_COMMAND_LENGTH = 17;
+// Command structure: "{HEADER}{CMD$}[ARG$]*"
 char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages
 const char pumpCMD[] = "PUMP";
 const char tempCMD[] = "TEMP";
 const char OKCMD[] = "OK";
-const char WTDRSTCMD[] = "WTD_RST";
+const char WTDRSTCMD[] = "WTD-RST";
+const char ERRCMD[] = "ERROR";
+const char setPumpTimeoutCMD[] = "SPT";
 
 
 #if DEBUG
@@ -100,16 +107,38 @@ const char WTDRSTCMD[] = "WTD_RST";
 #endif
 
 
-void rebootLoop()
+[[noreturn]] void rebootLoop()
 {
     wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
 
-    while (1)
+    while (true)
     {
         Serial.print('.');
         delay(500);
     }
 }
 
+const char* getErrorName(ErrorCode error)
+{
+    switch(error)
+    {
+        case NO_ERROR:
+            return "NO_ERROR";
+        case ERROR_TEMP_SENSOR_INVALID_VALUE:
+            return "ERROR_TEMP_SENSOR_INVALID_VALUE";
+        case ERROR_PRESSURE_SENSOR_INVALID_VALUE:
+            return "ERROR_PRESSURE_SENSOR_INVALID_VALUE";
+        case ERROR_COMMS_CONNECTION_NOT_ESTABLISHED:
+            return "ERROR_COMMS_CONNECTION_NOT_ESTABLISHED";
+        case ERROR_COMMS_NO_RESPONSE:
+            return "ERROR_COMMS_NO_RESPONSE";
+        case ERROR_COMMS_UNEXPECTED_MESSAGE:
+            return "ERROR_COMMS_UNEXPECTED_MESSAGE";
+        case ERROR_HEATER_MCU_ERROR:
+            return "ERROR_HEATER_MCU_ERROR";
+        default:
+            return "Unknown Error";
+    }
+}
 
 #endif

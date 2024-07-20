@@ -65,16 +65,19 @@ int SimpleComms::sendCommand(const char* command, const char** arguments, int nu
 
     int size = snprintf(buffer, SC_MAX_MESSAGE_SIZE, "%s%s$", header, command);
 
-    for (int i = 0; i < numArguments; i++)
+    if(arguments != nullptr)
     {
-        size_t argLen = strlen(arguments[i]);
-        if(size + argLen + 1 > SC_MAX_MESSAGE_SIZE)
-            return -1;
+        for (int i = 0; i < numArguments; i++)
+        {
+            size_t argLen = strlen(arguments[i]);
+            if(size + argLen + 1 > SC_MAX_MESSAGE_SIZE)
+                return -1;
 
-        strncat(buffer, arguments[i], SC_MAX_MESSAGE_SIZE - size);
-        size += (int)argLen;
-        strncat(buffer, dollar, SC_MAX_MESSAGE_SIZE - size);
-        size++;
+            strncat(buffer, arguments[i], SC_MAX_MESSAGE_SIZE - size);
+            size += (int)argLen;
+            strncat(buffer, dollar, SC_MAX_MESSAGE_SIZE - size);
+            size++;
+        }
     }
     buffer[min(size,SC_MAX_MESSAGE_SIZE)] = '\0';
 
