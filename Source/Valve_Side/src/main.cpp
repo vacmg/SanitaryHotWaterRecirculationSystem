@@ -334,13 +334,20 @@ void invalidateErrorData()
 void printErrorData()
 {
     EEPROMError eepromError;
+    bool anyError = false;
     for(uint8_t i = 0; i < EEPROM_ERROR_MEMORY_ITEMS; i++)
     {
         EEPROM.get(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
         if(eepromError.activeError)
         {
+            anyError = true;
             Serial.print(F("Error: ")); Serial.print(getErrorName(eepromError.errorCode)); Serial.print(F(" - Message: ")); Serial.println(eepromError.message);
         }
+    }
+
+    if(!anyError)
+    {
+        Serial.println(F("No errors found"));
     }
 
 }
@@ -356,6 +363,7 @@ void toggleFallbackMode(bool enableFallBackMode)
         }
         debugln(F("Enabling Error FallBack Mode"));
         EEPROM.put(EEPROM_FALLBACK_MODE_ENABLED_ADDRESS, true);
+        EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
         changeMode(ErrorFallBackMode);
         stepFSM();
     }
@@ -440,6 +448,7 @@ void setPumpTimeout(long timeout)
     resetWatchdogs();
     char args[12];
     snprintf(args, 12, "%ld", timeout);
+    const char* argsPtr[] = {args};
 
     #if DEBUG
         if(timeout == 0)
@@ -448,11 +457,12 @@ void setPumpTimeout(long timeout)
         }
         else
         {
-            debug(F("Setting pump timeout to ")); debugln(timeout);
+            debug(F("Setting pump timeout to ")); debugln(args);
         }
     #endif
 
-    comms.sendCommand(setPumpTimeoutCMD, reinterpret_cast<const char**>(args), 1);
+    comms.sendCommand(setPumpTimeoutCMD, argsPtr, 1);
+
     delay(RECEIVED_MESSAGE_TIMEOUT*PUMP_MESSAGE_PROCESSING_MULTIPLIER);
     if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
     {
@@ -491,19 +501,15 @@ void setPump(bool enable, bool ignoreErrors = false)
 {
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     resetWatchdogs();
-    const char** args;
+    const char* args[] = {"0"};
     if(enable)
     {
-        args = (const char**)&"1";
-    }
-    else
-    {
-        args = (const char**)&"0";
+        args[0] = "1";
     }
 
-    debug(enable?F("Starting pump..."):F("Stopping pump..."));
+    debugln(enable?F("Starting pump..."):F("Stopping pump..."));
 
-    comms.sendCommand(pumpCMD, args, 0);
+    comms.sendCommand(pumpCMD, args, 1);
     delay(RECEIVED_MESSAGE_TIMEOUT*PUMP_MESSAGE_PROCESSING_MULTIPLIER);
     if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
     {
@@ -527,18 +533,18 @@ void setPump(bool enable, bool ignoreErrors = false)
     }
 }
 
-float getValveTemp()
+float getValveTemp(bool ignoreErrors = false)
 {
     #if !MOCK_SENSORS
     char errorBuff[ERROR_MESSAGE_SIZE];
     tempSensor.requestTemperatures(); // Request temp
     float temp = tempSensor.getTempCByIndex(0); // Obtain temp
-    if(temp<MIN_ALLOWED_TEMP)
+    if(!ignoreErrors && temp<MIN_ALLOWED_TEMP)
     {
         snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),(int)temp);
         raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
     }
-    else if(temp>MAX_ALLOWED_TEMP)
+    else if(!ignoreErrors && temp>MAX_ALLOWED_TEMP)
     {
         snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),(int)temp);
         raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
@@ -549,7 +555,7 @@ float getValveTemp()
     #endif
 }
 
-bool getValveTempIfNecessary(float* temp)
+bool getValveTempIfNecessary(float* temp, bool ignoreErrors = false)
 {
     if(temp == nullptr)
     {
@@ -557,21 +563,21 @@ bool getValveTempIfNecessary(float* temp)
     }
     if(millis() - valveTempPMillis > VALVE_TEMP_GATHERING_PERIOD) // each 10 secs update valve temp
     {
-        *temp = getValveTemp();
+        *temp = getValveTemp(ignoreErrors);
         valveTempPMillis = millis();
         return true;
     }
     return false;
 }
 
-double getValvePressure()
+double getValvePressure(bool ignoreErrors = false)
 {
     int adcData = analogRead(A0);
 
     double pressureSensorVoltage = (adcData * 1.1)/1024;
     double pressureSensorCurrent = (pressureSensorVoltage*1000) / 51;
 
-    if(!(pressureSensorCurrent >= MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA && pressureSensorCurrent <= MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA))
+    if(!ignoreErrors && !(pressureSensorCurrent >= MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA && pressureSensorCurrent <= MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA))
     {
         char errorBuff[ERROR_MESSAGE_SIZE];
         snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("PRESSURE CURRENT (%dmA) IS OUTSIDE THE RANGE (%d, %d)mA"),(int)pressureSensorCurrent, (int)MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA, (int)MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA);
@@ -604,7 +610,7 @@ int getHeaterTemp(bool ignoreErrors = false)
     delay(RECEIVED_MESSAGE_TIMEOUT*TEMP_MESSAGE_PROCESSING_MULTIPLIER);
     if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
     {
-        if(strcmp(commsBuffer, OKCMD) == 0)
+        if(strcmp(commsBuffer, tempCMD) == 0)
         {
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
             {
@@ -688,8 +694,8 @@ void printSensorsInfo()
     Serial.println(F("Valve pressure sensor: MOCKED"));
     Serial.print(F(  "Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp);Serial.println(F("ºC"));
     #else
-    Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure());Serial.println(F("BAR"));
-    Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp());Serial.println(F("ºC"));
+    Serial.print(F(  "Valve pressure sensor: ")); Serial.print(getValvePressure(true));Serial.println(F("BAR"));
+    Serial.print(F(  "Valve temperature sensor: ")); Serial.print(getValveTemp(true));Serial.println(F("ºC"));
     #endif
     int heaterTemp = getHeaterTemp(true);
     Serial.print(F(    "Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
@@ -710,91 +716,93 @@ void checkResetTime()
 
 void serialEvent()
 {
-    char buffer[17];
-    size_t len = Serial.readBytesUntil('\n',buffer,16);
+    char buffer[65];
+    size_t len = Serial.readBytesUntil('\n', buffer, 64);
     buffer[len] = '\0';
 
     Serial.print(F("User input: ")); Serial.println(buffer);
 
-    if(strcmp(buffer,"help") == 0)
+    if(strstr(buffer,"help") != nullptr)
     {
         Serial.println(F(MAIN_HELP_STRING));
         #if MOCK_SENSORS
         Serial.println(F(MOCK_SENSORS_HELP_STRING));
         #endif
     }
-    else if(strcmp(buffer,"clear") == 0)
+    else if(strstr(buffer,"clear") != nullptr)
     {
         invalidateErrorData();
     }
-    else if(strcmp(buffer,"errorlist") == 0)
+    else if(strstr(buffer,"errorlist") != nullptr)
     {
         printErrorData();
     }
-    else if(strcmp(buffer,"enablefallback") == 0)
+    else if(strstr(buffer,"enablefallback") != nullptr)
     {
         toggleFallbackMode(true);
     }
-    else if(strcmp(buffer,"disablefallback") == 0)
+    else if(strstr(buffer,"disablefallback") != nullptr)
     {
         toggleFallbackMode(false);
     }
-    else if(strcmp(buffer,"sensors") == 0)
+    else if(strstr(buffer,"sensors") != nullptr)
     {
         printSensorsInfo();
     }
-    else if(strcmp(buffer,"startpump") == 0)
+    else if(strstr(buffer,"startpump") != nullptr)
     {
         setPump(true);
     }
-    else if(strcmp(buffer,"stoppump") == 0)
+    else if(strstr(buffer,"stoppump") != nullptr)
     {
         setPump(false);
     }
-    else if(strcmp(buffer,"openvalve") == 0)
+    else if(strstr(buffer,"openvalve") != nullptr)
     {
         setValve(true);
     }
-    else if(strcmp(buffer,"closevalve") == 0)
+    else if(strstr(buffer,"closevalve") != nullptr)
     {
         setValve(false);
     }
-    else if(strcmp(buffer,"reset") == 0)
+    else if(strstr(buffer,"reset") != nullptr)
     {
         invalidateErrorData();
+        changeMode(OnPressureTrigger);
         toggleFallbackMode(true);
         raiseError(NO_ERROR, F("Rebooting to complete reset"));
     }
-    else if(strcmp(buffer,"reseton") == 0)
+    else if(strstr(buffer,"reseton") != nullptr)
     {
         invalidateErrorData();
+        changeMode(OnPressureTrigger);
         toggleFallbackMode(false);
         raiseError(NO_ERROR, F("Rebooting to complete reset"));
     }
 
 
     #if MOCK_SENSORS
-        else if(strcmp(buffer,"e") == 0)
+        else if(strstr(buffer,"e") != nullptr)
         {
         Serial.println(F("Enabling trigger"));
         triggerVal = true;
         }
-        else if(strcmp(buffer,"d") == 0)
+        else if(strstr(buffer,"d") != nullptr)
         {
         Serial.println(F("Disabling trigger"));
         triggerVal = false;
         }
-        else if(strcmp(buffer,"n") == 0)
+        else if(strstr(buffer,"n") != nullptr)
         {
         Serial.println(F("Button press set to NO_PULSE"));
         btnSt = NO_PULSE;
         }
-        else if(strcmp(buffer,"s") == 0)
+        else if(strstr(buffer,"s") != nullptr)
         {
         Serial.println(F("Button press set to SHORT_PULSE"));
         btnSt = SHORT_PULSE;
         }
-        else if(strcmp(buffer,"l") == 0)
+        else if(strstr(buffer,"l") != nullptr)
         {
         Serial.println(F("Button press set to LONG_PULSE"));
         btnSt = LONG_PULSE;
@@ -812,7 +820,7 @@ void handleCommsEvent()
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
     {
-        if(strcmp(commsBuffer, ERRCMD) == 0)
+        if(strcmp(commsBuffer, ERRCMD) == 0) // TODO revisar errores de heater
         {
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
             {
@@ -842,6 +850,7 @@ void stepFSM()
             changeStatus(ErrorFallBack);
             break;
         case ErrorFallBack:
+            // TODO Animate warning LED
             break;
         case OnPressureTrigger_Begin:
             setPump(false);
@@ -890,17 +899,22 @@ void stepFSM()
             break;
         case OnPressureTrigger_ServingWater:
             {
-                float valveTemp;
+                float valveTemp; // todo revisar debug y serial.print
 
-                if(getValveTempIfNecessary(&valveTemp) && !isTriggerActive() && valveTemp < desiredTemp)
+                if(getValveTempIfNecessary(&valveTemp))
                 {
-                    setValve(false);
+                    debug(F("ServingWater\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
+                    if(!isTriggerActive() && valveTemp < desiredTemp)
+                    {
+                        setValve(false);
 
-                    changeStatus(OnPressureTrigger_WaitingCold);
+                        changeStatus(OnPressureTrigger_WaitingCold);
+                    }
                 }
+
             }
             break;
-        case AlwaysActive_Begin:
+        case AlwaysActive_Begin: // TODO probar este modo
             setPumpTimeout(0);
             setPump(true);
             setValve(true);
@@ -979,7 +993,7 @@ void connectToHeater(bool ignoreErrors = false)
     #endif
 }
 
-void setup()
+void setup() // TODO revisar unknown mode
 {
     wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
 
@@ -1057,6 +1071,7 @@ void setup()
     #if MOCK_SENSORS
         Serial.println(F(MOCK_SENSORS_HELP_STRING));
     #endif
+    Serial.println();
 
     delay(1000);
 
@@ -1066,6 +1081,13 @@ void setup()
     }
     else
     {
+        EEPROM.get(EEPROM_MODE_ADDRESS, currentMode);
+        if(currentMode >= NUM_OF_MODES)
+        {
+            debugln(F("WARNING: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
+            changeMode(OnPressureTrigger);
+            EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
+        }
         toggleFallbackMode(false);
     }
 

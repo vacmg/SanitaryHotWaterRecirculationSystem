@@ -107,8 +107,9 @@ void autoDisablePumpIfTimeout()
         char buff2[32];
         sprintf(commsBuffer, "ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = %s > Timeout = %s)\nDISCONNECTING IT...", formattedTime(static_cast<long>(millis() - pumpPMillis), buff), formattedTime(autoDisablePumpTimeout, buff2));
         debugln(commsBuffer);
+        const char* argsPtr[] = {commsBuffer};
 
-        comms.sendCommand(ERRCMD, (const char**)&commsBuffer, 1);
+        comms.sendCommand(ERRCMD, argsPtr, 1);
 
         debugln(F("Rebooting both MCUs"));
         rebootLoop();
@@ -165,6 +166,16 @@ void handleCommsEvent()
                 debugln(F("Sending OK CMD"));
                 comms.sendCommand(OKCMD, nullptr, 0);
             }
+            else
+            {
+                sprintf(commsBuffer, "ERROR: No argument found in PUMP command");
+                debugln(commsBuffer);
+                const char* argsPtr[] = {commsBuffer};
+                comms.sendCommand(ERRCMD, argsPtr, 0);
+
+                debugln(F("Rebooting both MCUs"));
+                rebootLoop();
+            }
         }
         else if(strcmp(commsBuffer, tempCMD) == 0)
         {
@@ -175,9 +186,10 @@ void handleCommsEvent()
 
             char tempStr[10];
             sprintf(tempStr, "%d", temp);
+            const char* argsPtr[] = {tempStr};
 
             debug(F("Sending TEMP CMD ANSWER: ")); debugln(tempStr);
-            comms.sendCommand(tempCMD, (const char**)&tempStr, 1);
+            comms.sendCommand(tempCMD, argsPtr, 1);
 
         }
         else if(strcmp(commsBuffer, setPumpTimeoutCMD) == 0)
@@ -186,7 +198,7 @@ void handleCommsEvent()
 
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE))
             {
-                autoDisablePumpTimeout = atoi(commsBuffer);
+                autoDisablePumpTimeout = atol(commsBuffer);
                 debug(F("New pump timeout: ")); debugln(autoDisablePumpTimeout);
 
                 debugln(F("Sending OK CMD"));
@@ -196,7 +208,8 @@ void handleCommsEvent()
             {
                 sprintf(commsBuffer, "ERROR: No argument found in DPT command");
                 debugln(commsBuffer);
-                comms.sendCommand(ERRCMD, reinterpret_cast<const char**>(commsBuffer), 0);
+                const char* argsPtr[] = {commsBuffer};
+                comms.sendCommand(ERRCMD, argsPtr, 0);
 
                 debugln(F("Rebooting both MCUs"));
                 rebootLoop();
@@ -206,7 +219,6 @@ void handleCommsEvent()
         {
             debug(F("WARNING: Unknown command: ")); debugln(commsBuffer);
         }
-        debugln();
     }
 }
 
