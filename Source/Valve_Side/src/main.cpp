@@ -142,6 +142,8 @@ const char* modeToString(Mode mode)
             return "OnPressureTrigger";
         case AlwaysActive:
             return "AlwaysActive";
+        case ErrorFallBackMode:
+            return "ErrorFallBackMode";
         default:
             return "Unknown Mode";
     }
@@ -438,6 +440,18 @@ void toggleFallbackMode(bool enableFallBackMode)
     raiseError(error, buff);
 }
 
+void handleHeaterError(char* buff = nullptr)
+{
+    if(comms.getNextArgument(buff, SC_MAX_MESSAGE_SIZE) > 0)
+    {
+        raiseError(ERROR_HEATER_MCU_ERROR, buff);
+    }
+    else
+    {
+        raiseError(ERROR_HEATER_MCU_ERROR);
+    }
+}
+
 void setPumpTimeout(long timeout)
 {
     if(timeout < 0)
@@ -479,6 +493,10 @@ void setPumpTimeout(long timeout)
                 }
             #endif
         }
+        else if(strcmp(commsBuffer, ERRCMD) == 0)
+        {
+            handleHeaterError(commsBuffer);
+        }
         else
         {
             char errorBuff[ERROR_MESSAGE_SIZE];
@@ -516,6 +534,10 @@ void setPump(bool enable, bool ignoreErrors = false)
         if(strcmp(commsBuffer, OKCMD) == 0)
         {
             debugln(enable?F("Pump started successfully"):F("Pump stopped successfully"));
+        }
+        else if(strcmp(commsBuffer, ERRCMD) == 0)
+        {
+            handleHeaterError(commsBuffer);
         }
         else
         {
@@ -820,16 +842,9 @@ void handleCommsEvent()
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
     {
-        if(strcmp(commsBuffer, ERRCMD) == 0) // TODO revisar errores de heater
+        if(strcmp(commsBuffer, ERRCMD) == 0)
         {
-            if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
-            {
-                raiseError(ERROR_HEATER_MCU_ERROR, commsBuffer);
-            }
-            else
-            {
-                raiseError(ERROR_HEATER_MCU_ERROR);
-            }
+            handleHeaterError(commsBuffer);
         }
         else
         {
@@ -899,7 +914,7 @@ void stepFSM()
             break;
         case OnPressureTrigger_ServingWater:
             {
-                float valveTemp; // todo revisar debug y serial.print
+                float valveTemp;
 
                 if(getValveTempIfNecessary(&valveTemp))
                 {
@@ -993,7 +1008,7 @@ void connectToHeater(bool ignoreErrors = false)
     #endif
 }
 
-void setup() // TODO revisar unknown mode
+void setup()
 {
     wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
 
