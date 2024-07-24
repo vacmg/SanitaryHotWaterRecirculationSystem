@@ -865,7 +865,28 @@ void stepFSM()
             changeStatus(ErrorFallBack);
             break;
         case ErrorFallBack:
-            // TODO Animate warning LED
+            {
+                static byte brightness = 255;
+                static bool increasing = false;
+                if(increasing)
+                {
+                    brightness++;
+                    if(brightness == 255)
+                    {
+                        increasing = false;
+                    }
+                }
+                else
+                {
+                    brightness--;
+                    if(brightness == 0)
+                    {
+                        increasing = true;
+                    }
+                }
+
+                writeColor(brightness, brightness, 0);
+            }
             break;
         case OnPressureTrigger_Begin:
             setPump(false);
