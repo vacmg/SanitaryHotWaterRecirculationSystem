@@ -358,7 +358,7 @@ void toggleFallbackMode(bool enableFallBackMode)
     {
         if(currentMode == ErrorFallBackMode)
         {
-            debugln(F("Error FallBack Mode already enabled"));
+            debugln(F("Warning: FallBack Mode already enabled"));
             return;
         }
         debugln(F("Enabling Error FallBack Mode"));
@@ -374,7 +374,7 @@ void toggleFallbackMode(bool enableFallBackMode)
         EEPROM.get(EEPROM_MODE_ADDRESS, mode);
         if(currentMode >= NUM_OF_MODES)
         {
-            debugln(F("ERROR: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
+            Serial.println(F("ERROR: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
             mode = OnPressureTrigger;
         }
         changeMode(mode);
@@ -418,14 +418,14 @@ void toggleFallbackMode(bool enableFallBackMode)
         }
         if(!errorSaved)
         {
-            debugln(F("ERROR: Error memory is full"));
+            Serial.println(F("ERROR: Error memory is full"));
         }
     }
     #endif
 
     toggleFallbackMode(true);
 
-    debugln(F("Rebooting..."));
+    Serial.println(F("Rebooting..."));
     rebootLoop();
 }
 
@@ -934,7 +934,7 @@ void connectToHeater(bool ignoreErrors = false)
 
     long timeout = currentMode == ErrorFallBackMode ? INIT_CONNECTION_TIMEOUT_FALLBACK : INIT_CONNECTION_TIMEOUT;
 
-    debug(F("Connecting to heater MCU...\tTimeout in ")); debugln(formattedTime(timeout, commsBuffer));
+    Serial.print(F("Connecting to heater MCU...\tTimeout in ")); Serial.println(formattedTime(timeout, commsBuffer));
 
     while(!connected && (millis() - connectionPMillis < timeout))
     {
@@ -954,7 +954,7 @@ void connectToHeater(bool ignoreErrors = false)
             if(strcmp(commsBuffer, OKCMD) == 0)
             {
                 connected = true;
-                debugln(F("Connection established with heater MCU"));
+                Serial.println(F("Connection established with heater MCU"));
             }
             else if(!ignoreErrors)
             {
@@ -981,12 +981,12 @@ void connectToHeater(bool ignoreErrors = false)
         }
         else
         {
-            debugln(F("Timeout connecting to the HEATER MCU"));
+            Serial.println(F("Timeout connecting to the HEATER MCU"));
         }
     }
     else
     {
-        debugln(F("Connection established with heater MCU in ")); debugln(formattedTime(millis() - connectionPMillis, commsBuffer));
+        Serial.println(F("Connection established with heater MCU in ")); Serial.println(formattedTime(millis() - connectionPMillis, commsBuffer));
     }
     wdt_reset();
     delay(1000);

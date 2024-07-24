@@ -65,7 +65,7 @@ void waitForValveConnection()
         unsigned long connectionPMillis = millis();
         bool connected = false;
 
-        debugln(F("Waiting for connection from valve MCU..."));
+        Serial.println(F("Waiting for connection from valve MCU..."));
 
         while(!connected && (millis() - connectionPMillis < INIT_CONNECTION_TIMEOUT))
         {
@@ -78,7 +78,7 @@ void waitForValveConnection()
                 comms.sendCommand(OKCMD, nullptr, 0);
                 connected = true;
                 wdt_reset();
-                debugln(F("Connection established with valve MCU"));
+                Serial.println(F("Connection established with valve MCU"));
             }
         }
 
@@ -105,13 +105,13 @@ void autoDisablePumpIfTimeout()
 
         char buff[32];
         char buff2[32];
-        sprintf(commsBuffer, "ERROR: TIMEOUT REACHED FOR PUMP. (Elapsed time = %s > Timeout = %s)\nDISCONNECTING IT...", formattedTime(static_cast<long>(millis() - pumpPMillis), buff), formattedTime(autoDisablePumpTimeout, buff2));
-        debugln(commsBuffer);
+        sprintf(commsBuffer, "TIMEOUT REACHED FOR PUMP. (Elapsed time = %s > Timeout = %s)", formattedTime(static_cast<long>(millis() - pumpPMillis), buff), formattedTime(autoDisablePumpTimeout, buff2));
+        Serial.print(F("ERROR: "));Serial.println(commsBuffer);Serial.println(F("DISCONNECTING IT..."));
         const char* argsPtr[] = {commsBuffer};
 
         comms.sendCommand(ERRCMD, argsPtr, 1);
 
-        debugln(F("Rebooting both MCUs"));
+        Serial.println(F("Rebooting both MCUs"));
         rebootLoop();
     }
 }
@@ -168,12 +168,12 @@ void handleCommsEvent()
             }
             else
             {
-                sprintf(commsBuffer, "ERROR: No argument found in PUMP command");
-                debugln(commsBuffer);
+                sprintf(commsBuffer, "No argument found in PUMP command");
+                Serial.print(F("ERROR: ")); Serial.println(commsBuffer);
                 const char* argsPtr[] = {commsBuffer};
                 comms.sendCommand(ERRCMD, argsPtr, 0);
 
-                debugln(F("Rebooting both MCUs"));
+                Serial.println(F("Rebooting both MCUs"));
                 rebootLoop();
             }
         }
@@ -206,18 +206,18 @@ void handleCommsEvent()
             }
             else
             {
-                sprintf(commsBuffer, "ERROR: No argument found in DPT command");
-                debugln(commsBuffer);
+                sprintf(commsBuffer, "No argument found in DPT command");
+                Serial.print(F("ERROR: ")); Serial.println(commsBuffer);
                 const char* argsPtr[] = {commsBuffer};
                 comms.sendCommand(ERRCMD, argsPtr, 0);
 
-                debugln(F("Rebooting both MCUs"));
+                Serial.println(F("Rebooting both MCUs"));
                 rebootLoop();
             }
         }
         else
         {
-            debug(F("WARNING: Unknown command: ")); debugln(commsBuffer);
+            Serial.print(F("WARNING: Unknown command: ")); Serial.println(commsBuffer);
         }
     }
 }
