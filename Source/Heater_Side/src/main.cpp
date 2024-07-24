@@ -98,6 +98,11 @@ void waitForValveConnection()
 
 void autoDisablePumpIfTimeout()
 {
+    if(autoDisablePumpTimeout <= 0)
+    {
+        return;
+    }
+
     if(pumpEnabled && millis() - pumpPMillis > autoDisablePumpTimeout)
     {
         pumpEnabled = false;
