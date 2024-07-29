@@ -422,10 +422,9 @@ void toggleFallbackMode(bool enableFallBackMode)
         {
             Serial.println(F("ERROR: Error memory is full"));
         }
+        toggleFallbackMode(true);
     }
     #endif
-
-    toggleFallbackMode(true);
 
     Serial.println(F("Rebooting..."));
     rebootLoop();
