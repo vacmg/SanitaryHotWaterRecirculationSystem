@@ -791,54 +791,54 @@ void serialEvent()
     {
         setValve(false);
     }
-    else if(strstr(buffer,"reset") != nullptr)
-    {
-        invalidateErrorData();
-        changeMode(OnPressureTrigger);
-        toggleFallbackMode(true);
-        raiseError(NO_ERROR, F("Rebooting to complete reset"));
-    }
     else if(strstr(buffer,"reseton") != nullptr)
     {
         invalidateErrorData();
         changeMode(OnPressureTrigger);
         toggleFallbackMode(false);
-        raiseError(NO_ERROR, F("Rebooting to complete reset"));
+        raiseError(NO_ERROR, F("Rebooting to complete reset and disable fallback mode"));
+    }
+    else if(strstr(buffer,"reset") != nullptr)
+    {
+        invalidateErrorData();
+        changeMode(OnPressureTrigger);
+        toggleFallbackMode(true);
+        raiseError(NO_ERROR, F("Rebooting to complete reset and enable fallback mode"));
     }
 
 
-    #if MOCK_SENSORS
-        else if(strstr(buffer,"e") != nullptr)
-        {
+#if MOCK_SENSORS
+    else if(strstr(buffer,"e") != nullptr)
+    {
         Serial.println(F("Enabling trigger"));
         triggerVal = true;
-        }
-        else if(strstr(buffer,"d") != nullptr)
-        {
+    }
+    else if(strstr(buffer,"d") != nullptr)
+    {
         Serial.println(F("Disabling trigger"));
         triggerVal = false;
-        }
-        else if(strstr(buffer,"n") != nullptr)
-        {
+    }
+    else if(strstr(buffer,"n") != nullptr)
+    {
         Serial.println(F("Button press set to NO_PULSE"));
         btnSt = NO_PULSE;
-        }
-        else if(strstr(buffer,"s") != nullptr)
-        {
+    }
+    else if(strstr(buffer,"s") != nullptr)
+    {
         Serial.println(F("Button press set to SHORT_PULSE"));
         btnSt = SHORT_PULSE;
-        }
-        else if(strstr(buffer,"l") != nullptr)
-        {
+    }
+    else if(strstr(buffer,"l") != nullptr)
+    {
         Serial.println(F("Button press set to LONG_PULSE"));
         btnSt = LONG_PULSE;
-        }
-        else
-        {
+    }
+    else
+    {
         valveTemp = atoi(buffer);
         Serial.print(F("Setting valve temp to: ")); Serial.println(valveTemp);
     }
-    #endif
+#endif
 }
 
 void handleCommsEvent()
