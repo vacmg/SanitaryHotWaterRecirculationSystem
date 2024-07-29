@@ -44,7 +44,7 @@ typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
 #define WAITING_COLD_COLOR Gray
 #define DRIVING_WATER_COLOR Blue
 #define SERVING_WATER_COLOR Red
-#define CIRCULATING_WATER_COLOR Purple
+#define CIRCULATING_WATER_COLOR White
 
 typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 
@@ -1142,10 +1142,14 @@ void loop()
         case NO_PULSE:
             break;
         case SHORT_PULSE:
-            writeColor(USER_ACK_COLOR);
-            delay(2000);
-            changeMode(static_cast<Mode>((currentMode + 1) % NUM_OF_MODES));
-            EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
+            if(currentMode != ErrorFallBackMode)
+            {
+                writeColor(USER_ACK_COLOR);
+                delay(2000);
+                changeMode(static_cast<Mode>((currentMode + 1) % NUM_OF_MODES));
+                EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
+            }
+            break;
         case LONG_PULSE:
             writeColor(USER_ACK_COLOR);
             delay(2000);
