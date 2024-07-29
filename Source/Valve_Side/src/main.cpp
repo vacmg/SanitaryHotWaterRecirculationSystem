@@ -11,7 +11,7 @@
 #endif
 
 
-#define MAIN_HELP_STRING "\nType 'enablefallback' or 'disablefallback' to enable or disable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
+#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enablefallback' or 'disablefallback' to enable or disable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
 #define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as the valve temp\n"
 
 const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
@@ -750,6 +750,10 @@ void serialEvent()
         #if MOCK_SENSORS
         Serial.println(F(MOCK_SENSORS_HELP_STRING));
         #endif
+    }
+    else if(strstr(buffer,"reboot") != nullptr)
+    {
+        raiseError(NO_ERROR, F("Rebooting by user command"));
     }
     else if(strstr(buffer,"clear") != nullptr)
     {
