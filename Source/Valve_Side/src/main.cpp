@@ -422,6 +422,7 @@ void toggleFallbackMode(bool enableFallBackMode)
         {
             Serial.println(F("ERROR: Error memory is full"));
         }
+
         toggleFallbackMode(true);
     }
     #endif
@@ -1089,6 +1090,24 @@ void setup()
 
     if(fallbackModeEnabled)
     {
+        changeMode(ErrorFallBackMode);
+    }
+    else
+    {
+        EEPROM.get(EEPROM_MODE_ADDRESS, currentMode);
+        if(currentMode >= NUM_OF_MODES)
+        {
+            debugln(F("WARNING: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
+            changeMode(OnPressureTrigger);
+            EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
+        }
+        toggleFallbackMode(false);
+    }
+
+    delay(1000);
+
+    if(fallbackModeEnabled)
+    {
         Serial.println(F("\nWARNING: SYSTEM IN ERROR FALLBACK MODE\n\n"));
         connectToHeater(true);
     }
@@ -1114,22 +1133,6 @@ void setup()
     Serial.println();
 
     delay(1000);
-
-    if(fallbackModeEnabled)
-    {
-        changeMode(ErrorFallBackMode);
-    }
-    else
-    {
-        EEPROM.get(EEPROM_MODE_ADDRESS, currentMode);
-        if(currentMode >= NUM_OF_MODES)
-        {
-            debugln(F("WARNING: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
-            changeMode(OnPressureTrigger);
-            EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
-        }
-        toggleFallbackMode(false);
-    }
 
     resetWatchdogs();
 }
