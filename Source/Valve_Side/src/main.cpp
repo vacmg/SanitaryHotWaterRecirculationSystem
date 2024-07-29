@@ -890,6 +890,7 @@ void stepFSM()
                 }
 
                 writeColor(brightness, brightness, 0);
+                delay(ANIMATION_FRAME_DELAY);
             }
             break;
         case OnPressureTrigger_Begin:
@@ -920,7 +921,7 @@ void stepFSM()
 
                 if(getValveTempIfNecessary(&valveTemp))
                 {
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, 0, MAX_PROGRESS_VALUE);
+                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
                     debug(F("fadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     writeColor(progress, 0, 255-progress);
