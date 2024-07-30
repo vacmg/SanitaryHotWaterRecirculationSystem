@@ -45,6 +45,7 @@ typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
 #define DRIVING_WATER_COLOR Blue
 #define SERVING_WATER_COLOR Red
 #define CIRCULATING_WATER_COLOR White
+#define WDT_BOOT_DELAY_COLOR Cyan
 
 typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 
@@ -506,7 +507,7 @@ void setPumpTimeout(long timeout)
     }
     else
     {
-        raiseError(ERROR_COMMS_NO_RESPONSE, F("No response from the HEATER MCU"));
+        raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPumpTimeout response"));
     }
 }
 
@@ -551,7 +552,7 @@ void setPump(bool enable, bool ignoreErrors = false)
     }
     else if(!ignoreErrors)
     {
-        raiseError(ERROR_COMMS_NO_RESPONSE, F("No response from the HEATER MCU"));
+        raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPump response"));
     }
 }
 
@@ -665,7 +666,7 @@ int getHeaterTemp(bool ignoreErrors = false)
     {
         if(!ignoreErrors)
         {
-            raiseError(ERROR_COMMS_NO_RESPONSE, F("No response from the HEATER MCU"));
+            raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving getTemp response"));
         }
     }
     return NAN;
@@ -794,14 +795,14 @@ void serialEvent()
     else if(strstr(buffer,"reseton") != nullptr)
     {
         invalidateErrorData();
-        changeMode(OnPressureTrigger);
+        currentMode = OnPressureTrigger;
         toggleFallbackMode(false);
         raiseError(NO_ERROR, F("Rebooting to complete reset and disable fallback mode"));
     }
     else if(strstr(buffer,"reset") != nullptr)
     {
         invalidateErrorData();
-        changeMode(OnPressureTrigger);
+        currentMode = OnPressureTrigger;
         toggleFallbackMode(true);
         raiseError(NO_ERROR, F("Rebooting to complete reset and enable fallback mode"));
     }
@@ -1008,7 +1009,7 @@ void connectToHeater(bool ignoreErrors = false)
         {
             if(!ignoreErrors)
             {
-                raiseError(ERROR_COMMS_NO_RESPONSE, F("No response from the HEATER MCU"));
+                raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout connecting to heater"));
             }
 
         }
@@ -1049,7 +1050,7 @@ void setup()
 
     pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-    writeColor(Cyan);
+    writeColor(WDT_BOOT_DELAY_COLOR);
 
     #if !DISABLE_WATCHDOGS
     delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration. */
@@ -1095,7 +1096,7 @@ void setup()
     else
     {
         EEPROM.get(EEPROM_MODE_ADDRESS, currentMode);
-        if(currentMode >= NUM_OF_MODES)
+        if(currentMode >= NUM_OF_MODES || currentMode < 0)
         {
             debugln(F("WARNING: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
             changeMode(OnPressureTrigger);
@@ -1104,6 +1105,7 @@ void setup()
         toggleFallbackMode(false);
     }
 
+    writeColor(BOOT_COLOR);
     delay(1000);
 
     if(fallbackModeEnabled)
@@ -1135,6 +1137,8 @@ void setup()
     delay(1000);
 
     resetWatchdogs();
+
+    writeColor(statusToColor(currentStatus));
 }
 
 void loop()
