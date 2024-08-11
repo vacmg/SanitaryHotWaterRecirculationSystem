@@ -15,8 +15,8 @@
 
 #define VS "V2.0.0"
 
-#define DEBUG 0
-#define DEBUGWATCHDOG 0
+#define DEBUG 1
+#define DEBUGWATCHDOG 1
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
@@ -57,7 +57,7 @@ const float MAX_ALLOWED_TEMP = 67; // 67ºc
 const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
 const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
-const int WATCHDOG_RESET_PERIOD = 6000; // 6 s
+const int WATCHDOG_RESET_PERIOD = 5000; // 5 s
 const long SYSTEM_RESET_PERIOD = 86400000; // 24 h
 
 const int MIN_PROGRESS_VALUE = 0; // [0-255]
@@ -83,15 +83,16 @@ const double WATER_MIN_NORMAL_PRESSURE_BAR = 2.75;
 const double PRESSURE_SENSOR_CURRENT_MIN_mA = 3.6;
 const double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
 
-const int RECEIVED_MESSAGE_TIMEOUT = 100; // 100 ms
-const int PUMP_MESSAGE_PROCESSING_MULTIPLIER = 2;
-const int TEMP_MESSAGE_PROCESSING_MULTIPLIER = 15;
-const int WDT_RST_MESSAGE_PROCESSING_MULTIPLIER = 2;
+const int RECEIVED_MESSAGE_TIMEOUT = 400; // 100 ms
+const int PUMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
+const int TEMP_MESSAGE_PROCESSING_WAIT_TIME = 2500;
+const int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 300;
+const int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 300;
 
 // Command structure: "{HEADER}{CMD$}[ARG$]*"
 char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages
 const char pumpCMD[] = "PUMP";
-const char tempCMD[] = "TEMP";
+const char tempCMD[] = "TMP";
 const char OKCMD[] = "OK";
 const char WTDRSTCMD[] = "WTD-RST";
 const char ERRCMD[] = "ERROR";
@@ -100,7 +101,7 @@ const char setPumpTimeoutCMD[] = "SPT";
 
 #if DEBUG
 #define debug(...) do {Serial.print(__VA_ARGS__); Serial.flush();} while(0)
-  #define debugln(...) do {Serial.println(__VA_ARGS__); Serial.flush();} while(0)
+#define debugln(...) do {Serial.println(__VA_ARGS__); Serial.flush();} while(0)
 #else
 #define debug(...)
 #define debugln(...)

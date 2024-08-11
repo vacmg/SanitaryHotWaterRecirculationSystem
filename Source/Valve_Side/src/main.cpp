@@ -11,7 +11,7 @@
 #endif
 
 
-#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enablefallback' or 'disablefallback' to enable or disable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
+#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enablefallback' or 'disablefallback' to enable or disable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'changemode' to change the operation mode to the next one (similar to pressing the button);\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
 #define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as the valve temp\n"
 
 const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
@@ -252,10 +252,11 @@ void resetWatchdogs()
     #endif
 
     comms.sendCommand(WTDRSTCMD, nullptr, 0);
-    delay(RECEIVED_MESSAGE_TIMEOUT*WDT_RST_MESSAGE_PROCESSING_MULTIPLIER);
+    delay(WDT_RST_MESSAGE_PROCESSING_WAIT_TIME);
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
 
-    if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+    if(res > 0)
     {
         if(strcmp(commsBuffer, OKCMD) == 0)
         {
@@ -272,7 +273,14 @@ void resetWatchdogs()
     }
     else if (currentMode != ErrorFallBackMode)
     {
-        raiseError(ERROR_COMMS_NO_RESPONSE, F("No response from the HEATER MCU"));
+        if(res == 0)
+        {
+            raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving WTD-RST response"));
+        }
+        else
+        {
+            raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
+        }
     }
 }
 
@@ -344,7 +352,7 @@ void printErrorData()
         if(eepromError.activeError)
         {
             anyError = true;
-            Serial.print(F("Error: ")); Serial.print(getErrorName(eepromError.errorCode)); Serial.print(F(" - Message: ")); Serial.println(eepromError.message);
+            Serial.print(F("Error: ")); Serial.print(getErrorName(eepromError.errorCode)); Serial.print(F(" - ")); Serial.println(eepromError.message);
         }
     }
 
@@ -364,7 +372,7 @@ void toggleFallbackMode(bool enableFallBackMode)
             debugln(F("Warning: FallBack Mode already enabled"));
             return;
         }
-        debugln(F("Enabling Error FallBack Mode"));
+        debug(F("Enabling Error FallBack Mode from mode "));debugln(modeToString(currentMode));
         EEPROM.put(EEPROM_FALLBACK_MODE_ENABLED_ADDRESS, true);
         EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
         changeMode(ErrorFallBackMode);
@@ -375,7 +383,7 @@ void toggleFallbackMode(bool enableFallBackMode)
         debugln(F("Disabling Error FallBack Mode"));
         Mode mode;
         EEPROM.get(EEPROM_MODE_ADDRESS, mode);
-        if(currentMode >= NUM_OF_MODES)
+        if(mode >= NUM_OF_MODES)
         {
             Serial.println(F("ERROR: Invalid Mode stored in EEPROM, setting to OnPressureTrigger"));
             mode = OnPressureTrigger;
@@ -392,7 +400,7 @@ void toggleFallbackMode(bool enableFallBackMode)
     #endif
     Serial.println(F("\n-----------------------------------------"));
     Serial.println(F("-----------------------------------------"));
-    Serial.print(F("ERROR RAISED: ")); Serial.print(getErrorName(error)); if(message != nullptr) {Serial.print(F(": ")); Serial.print(message);} Serial.println();
+    Serial.print(F("ERROR RAISED: ")); Serial.print(getErrorName(error)); if(message != nullptr) {Serial.print(F(": ")); Serial.print(message);} else {Serial.print(F("No aditional information provided"));} Serial.println();
     Serial.println(F("-----------------------------------------"));
     Serial.println(F("-----------------------------------------\n"));
 
@@ -414,6 +422,10 @@ void toggleFallbackMode(bool enableFallBackMode)
                 if(message != nullptr)
                 {
                     strncpy(eepromError.message, message, ERROR_MESSAGE_SIZE);
+                }
+                else
+                {
+                    strncpy_P(eepromError.message, PSTR("No message provided"), ERROR_MESSAGE_SIZE);
                 }
                 EEPROM.put(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
                 errorSaved = true;
@@ -449,7 +461,7 @@ void handleHeaterError(char* buff = nullptr)
     }
     else
     {
-        raiseError(ERROR_HEATER_MCU_ERROR);
+        raiseError(ERROR_HEATER_MCU_ERROR); // TODO check why this is raised
     }
 }
 
@@ -478,8 +490,9 @@ void setPumpTimeout(long timeout)
 
     comms.sendCommand(setPumpTimeoutCMD, argsPtr, 1);
 
-    delay(RECEIVED_MESSAGE_TIMEOUT*PUMP_MESSAGE_PROCESSING_MULTIPLIER);
-    if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+    delay(PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME);
+    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+    if(res > 0)
     {
         if(strcmp(commsBuffer, OKCMD) == 0)
         {
@@ -505,9 +518,13 @@ void setPumpTimeout(long timeout)
             raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
         }
     }
-    else
+    else if(res == 0)
     {
         raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPumpTimeout response"));
+    }
+    else
+    {
+        raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
     }
 }
 
@@ -516,7 +533,7 @@ void setValve(bool enable)
     digitalWrite(VALVE_RELAY_PIN, enable?RELAY_ENABLED:RELAY_DISABLED);
 }
 
-void setPump(bool enable, bool ignoreErrors = false)
+void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrompa la memoria al recibir heater este mensaje
 {
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     resetWatchdogs();
@@ -526,11 +543,12 @@ void setPump(bool enable, bool ignoreErrors = false)
         args[0] = "1";
     }
 
-    debugln(enable?F("Starting pump..."):F("Stopping pump..."));
+    debug(enable?F("Starting pump... "):F("Stopping pump... ")); if(ignoreErrors) {debug(F("Ignoring errors"));} debugln();
 
     comms.sendCommand(pumpCMD, args, 1);
-    delay(RECEIVED_MESSAGE_TIMEOUT*PUMP_MESSAGE_PROCESSING_MULTIPLIER);
-    if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+    delay(PUMP_MESSAGE_PROCESSING_WAIT_TIME);
+    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+    if(res > 0)
     {
         if(strcmp(commsBuffer, OKCMD) == 0)
         {
@@ -538,7 +556,18 @@ void setPump(bool enable, bool ignoreErrors = false)
         }
         else if(strcmp(commsBuffer, ERRCMD) == 0)
         {
-            handleHeaterError(commsBuffer);
+            if(!ignoreErrors)
+            {
+                handleHeaterError(commsBuffer);
+            }
+            else if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+            {
+                debug(F("HEATER MCU returned the error: '")); debug(commsBuffer); debugln(F("', but it was ignored"));
+            }
+            else
+            {
+                debugln(F("HEATER MCU returned an error, but it was ignored"));
+            }
         }
         else
         {
@@ -552,7 +581,14 @@ void setPump(bool enable, bool ignoreErrors = false)
     }
     else if(!ignoreErrors)
     {
-        raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPump response"));
+        if(res == 0)
+        {
+            raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPump response"));
+        }
+        else
+        {
+            raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
+        }
     }
 }
 
@@ -630,8 +666,9 @@ int getHeaterTemp(bool ignoreErrors = false)
         debugln(F("Getting heater temp..."));
     }
     comms.sendCommand(tempCMD, nullptr, 0);
-    delay(RECEIVED_MESSAGE_TIMEOUT*TEMP_MESSAGE_PROCESSING_MULTIPLIER);
-    if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+    delay(TEMP_MESSAGE_PROCESSING_WAIT_TIME);
+    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+    if(res > 0)
     {
         if(strcmp(commsBuffer, tempCMD) == 0)
         {
@@ -666,7 +703,14 @@ int getHeaterTemp(bool ignoreErrors = false)
     {
         if(!ignoreErrors)
         {
-            raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving getTemp response"));
+            if(res == 0)
+            {
+                raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving getTemp response"));
+            }
+            else
+            {
+                raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
+            }
         }
     }
     return NAN;
@@ -737,6 +781,12 @@ void checkResetTime()
 }
 #endif
 
+void setNextMode()
+{
+    changeMode(static_cast<Mode>((currentMode + 1) % NUM_OF_MODES));
+    EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
+}
+
 void serialEvent()
 {
     char buffer[65];
@@ -776,13 +826,17 @@ void serialEvent()
     {
         printSensorsInfo();
     }
+    else if(strstr(buffer,"changemode") != nullptr)
+    {
+        setNextMode();
+    }
     else if(strstr(buffer,"startpump") != nullptr)
     {
-        setPump(true);
+        setPump(true, true);
     }
     else if(strstr(buffer,"stoppump") != nullptr)
     {
-        setPump(false);
+        setPump(false, true);
     }
     else if(strstr(buffer,"openvalve") != nullptr)
     {
@@ -845,16 +899,25 @@ void serialEvent()
 void handleCommsEvent()
 {
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
-    if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+    if(res > 0)
     {
         if(strcmp(commsBuffer, ERRCMD) == 0)
         {
+            if(!comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+            {
+                snprintf_P(commsBuffer, SC_MAX_MESSAGE_SIZE, PSTR("No error message provided"));
+            }
             handleHeaterError(commsBuffer);
         }
         else
         {
             debug(F("handleCommsEvent: Unknown command: ")); debugln(commsBuffer);
         }
+    }
+    else if(res < 0)
+    {
+        Serial.println(F("handleCommsEvent: Error parsing message header"));
     }
 }
 
@@ -934,7 +997,7 @@ void stepFSM()
 
                         changeStatus(OnPressureTrigger_ServingWater);
 
-                        desiredTemp = getDesiredTemp(getHeaterTemp());
+                        desiredTemp = getDesiredTemp(getHeaterTemp()); // TODO quizas esta seccion tarda demasiado?
                     }
                 }
             }
@@ -989,7 +1052,7 @@ void connectToHeater(bool ignoreErrors = false)
 
         comms.sendCommand(WTDRSTCMD, nullptr, 0);
 
-        delay(WDT_RST_MESSAGE_PROCESSING_MULTIPLIER*RECEIVED_MESSAGE_TIMEOUT);
+        delay(WDT_RST_MESSAGE_PROCESSING_WAIT_TIME);
 
         if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
         {
@@ -1134,11 +1197,20 @@ void setup()
     #endif
     Serial.println();
 
+    printErrorData();
+
+    Serial.println();
+
     delay(1000);
 
     resetWatchdogs();
 
     writeColor(statusToColor(currentStatus));
+
+    if(Serial.available())
+    {
+        serialEvent();
+    }
 }
 
 void loop()
@@ -1153,8 +1225,7 @@ void loop()
             {
                 writeColor(USER_ACK_COLOR);
                 delay(2000);
-                changeMode(static_cast<Mode>((currentMode + 1) % NUM_OF_MODES));
-                EEPROM.put(EEPROM_MODE_ADDRESS, currentMode);
+                setNextMode();
             }
             break;
         case LONG_PULSE:

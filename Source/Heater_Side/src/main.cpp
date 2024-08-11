@@ -72,13 +72,18 @@ void waitForValveConnection()
             wdt_reset();
             delay(20);
 
-            if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0 && strcmp(commsBuffer, WTDRSTCMD) == 0)
+            int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+            if(res > 0 && strcmp(commsBuffer, WTDRSTCMD) == 0)
             {
                 debugln(F("Got a message from valve MCU, answering with OK..."));
                 comms.sendCommand(OKCMD, nullptr, 0);
                 connected = true;
                 wdt_reset();
                 Serial.println(F("Connection established with valve MCU"));
+            }
+            else if(res < 0)
+            {
+                Serial.println(F("WARNING: Message header could not be parsed and was discarded"));
             }
         }
 
@@ -123,24 +128,30 @@ void autoDisablePumpIfTimeout()
 
 void handleCommsEvent()
 {
-    if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+    if(res > 0)
     {
         #if !DISABLE_WATCHDOGS
         if(strcmp(commsBuffer, WTDRSTCMD) == 0)
         {
             wdt_reset();
             #if DEBUGWATCHDOG
-            debugln(F("Watchdog Reset CMD PARSED"));
-            debugln(F("Sending OK CMD"));
+                debugln(F("Watchdog Reset CMD PARSED"));
+                debugln(F("Sending OK CMD"));
             #endif
 
             comms.sendCommand(OKCMD, nullptr, 0);
+
+            #if DEBUGWATCHDOG
+                debugln(F("Watchdog reset command processed"));
+            #endif
         }
         else
         #endif
         if(strcmp(commsBuffer, pumpCMD) == 0)
         {
             debugln(F("PUMP CMD PARSED"));
+            wdt_reset();
 
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
             {
@@ -170,6 +181,7 @@ void handleCommsEvent()
 
                 debugln(F("Sending OK CMD"));
                 comms.sendCommand(OKCMD, nullptr, 0);
+                debugln(F("Pump command processed"));
             }
             else
             {
@@ -185,6 +197,7 @@ void handleCommsEvent()
         else if(strcmp(commsBuffer, tempCMD) == 0)
         {
             debugln(F("TEMP CMD PARSED"));
+            wdt_reset();
 
             int temp = (int)getTemp();
             debug(F("Current temp: ")); debugln(temp);
@@ -195,11 +208,13 @@ void handleCommsEvent()
 
             debug(F("Sending TEMP CMD ANSWER: ")); debugln(tempStr);
             comms.sendCommand(tempCMD, argsPtr, 1);
+            debugln(F("Temp sent"));
 
         }
         else if(strcmp(commsBuffer, setPumpTimeoutCMD) == 0)
         {
             debugln(F("DPT CMD PARSED"));
+            wdt_reset();
 
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE))
             {
@@ -208,6 +223,7 @@ void handleCommsEvent()
 
                 debugln(F("Sending OK CMD"));
                 comms.sendCommand(OKCMD, nullptr, 0);
+                debugln(F("Pump timeout updated"));
             }
             else
             {
@@ -224,6 +240,10 @@ void handleCommsEvent()
         {
             Serial.print(F("WARNING: Unknown command: ")); Serial.println(commsBuffer);
         }
+    }
+    else if(res < 0)
+    {
+        Serial.println(F("WARNING: Message header could not be parsed and was discarded"));
     }
 }
 
