@@ -27,6 +27,11 @@ bool pumpEnabled = false;
 unsigned long pumpPMillis = 0;
 long autoDisablePumpTimeout = AUTO_DISABLE_PUMP_TIMEOUT;
 
+unsigned long tempRequestTempMillis = 0;
+bool tempRequested = false;
+unsigned long TEMP_WAIT_FROM_REQUEST_TO_READ; // Updated to the real value at setup
+float temp = 0;
+
 char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
 
 
@@ -49,13 +54,35 @@ const char* formattedTime(long milliseconds, char* buff)
     return buff;
 }
 
+void requestTempIfNecessary()
+{
+    #if MOCK_SENSORS
+    if((!tempRequested) && (millis() - tempRequestTempMillis > HEATER_TEMP_GATHERING_PERIOD))
+    {
+        tempRequestTempMillis = millis();
+        tempSensor.requestTemperatures();
+        tempRequested = true;
+    }
+    #endif
+}
+
+void getTempIfNecessary()
+{
+    #if MOCK_SENSORS
+    if((tempRequested) && (millis() - tempRequestTempMillis > TEMP_WAIT_FROM_REQUEST_TO_READ))
+    {
+        temp = tempSensor.getTempCByIndex(0);
+        tempRequested = false;
+    }
+    #endif
+}
+
 float getTemp()
 {
     #if MOCK_SENSORS
         return 63.38;
     #else
-        tempSensor.requestTemperatures(); // Request temp
-        return tempSensor.getTempCByIndex(0); // Obtain temp
+        return temp;
     #endif
 }
 
@@ -266,6 +293,8 @@ void setup()
 
     #if !MOCK_SENSORS
         tempSensor.begin();
+        tempSensor.setWaitForConversion(false);
+        TEMP_WAIT_FROM_REQUEST_TO_READ = DallasTemperature::millisToWaitForConversion(tempSensor.getResolution());
     #endif
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
@@ -290,6 +319,9 @@ void setup()
 
 void loop()
 {
+    requestTempIfNecessary();
+    getTempIfNecessary();
+
     handleCommsEvent();
     autoDisablePumpIfTimeout();
 
