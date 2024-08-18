@@ -56,7 +56,7 @@ const char* formattedTime(long milliseconds, char* buff)
 
 void requestTempIfNecessary()
 {
-    #if MOCK_SENSORS
+    #if !MOCK_SENSORS
     if((!tempRequested) && (millis() - tempRequestTempMillis > HEATER_TEMP_GATHERING_PERIOD))
     {
         tempRequestTempMillis = millis();
@@ -68,7 +68,7 @@ void requestTempIfNecessary()
 
 void getTempIfNecessary()
 {
-    #if MOCK_SENSORS
+    #if !MOCK_SENSORS
     if((tempRequested) && (millis() - tempRequestTempMillis > TEMP_WAIT_FROM_REQUEST_TO_READ))
     {
         temp = tempSensor.getTempCByIndex(0);
@@ -226,7 +226,7 @@ void handleCommsEvent()
             debugln(F("TEMP CMD PARSED"));
             wdt_reset();
 
-            int temp = (int)getTemp();
+            int temp = static_cast<int>(getTemp());
             debug(F("Current temp: ")); debugln(temp);
 
             char tempStr[10];
