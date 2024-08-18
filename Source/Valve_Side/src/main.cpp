@@ -65,7 +65,6 @@ unsigned long watchdogsPMillis = 0;
 #if MOCK_SENSORS
 ButtonStatus btnSt = NO_PULSE;
 bool triggerVal = false;
-int valveTemp = 0;
 #endif
 
 unsigned long heaterTempPMillis = 0;
@@ -73,6 +72,11 @@ unsigned long valveTempPMillis = 0;
 
 int progressMinTemp = 0;
 int desiredTemp = 0;
+
+unsigned long valveTempRequestTempMillis = 0;
+bool valveTempRequested = false;
+unsigned long VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ; // Updated to the real value at setup
+float valveTemp = 0;
 
 void stepFSM();
 [[noreturn]] void raiseError(ErrorCode error, const char* message = nullptr);
@@ -592,41 +596,66 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
     }
 }
 
-float getValveTemp(bool ignoreErrors = false)
+void requestValveTempIfNecessary()
 {
-    #if !MOCK_SENSORS
-    char errorBuff[ERROR_MESSAGE_SIZE];
-    tempSensor.requestTemperatures(); // Request temp
-    float temp = tempSensor.getTempCByIndex(0); // Obtain temp
-    if(!ignoreErrors && temp<MIN_ALLOWED_TEMP)
+#if !MOCK_SENSORS
+    if((!valveTempRequested) && (millis() - valveTempRequestTempMillis > VALVE_TEMP_GATHERING_PERIOD))
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),(int)temp);
-        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+        valveTempRequestTempMillis = millis();
+        tempSensor.requestTemperatures();
+        valveTempRequested = true;
     }
-    else if(!ignoreErrors && temp>MAX_ALLOWED_TEMP)
-    {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),(int)temp);
-        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
-    }
-    return temp;
-    #else
-    return valveTemp;
-    #endif
+#endif
 }
 
-bool getValveTempIfNecessary(float* temp, bool ignoreErrors = false)
+bool getValveTempIfNecessary(bool ignoreErrors = false)
 {
-    if(temp == nullptr)
+#if !MOCK_SENSORS
+    if((valveTempRequested) && (millis() - valveTempRequestTempMillis > VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ))
     {
-        return false;
-    }
-    if(millis() - valveTempPMillis > VALVE_TEMP_GATHERING_PERIOD) // each 10 secs update valve temp
-    {
-        *temp = getValveTemp(ignoreErrors);
-        valveTempPMillis = millis();
+        valveTemp = tempSensor.getTempCByIndex(0); // Obtain temp
+
+        char errorBuff[ERROR_MESSAGE_SIZE];
+        if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
+        {
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),(int)valveTemp);
+            raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+        }
+        if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
+        {
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),(int)valveTemp);
+            raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+        }
+        valveTempRequested = false;
         return true;
     }
     return false;
+#else
+    return true;
+#endif
+}
+
+float getValveTemp(bool ignoreErrors = false)
+{
+    tempSensor.setWaitForConversion(true);
+
+    tempSensor.requestTemperatures();
+    valveTemp = tempSensor.getTempCByIndex(0);
+
+    char errorBuff[ERROR_MESSAGE_SIZE];
+    if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
+    {
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),(int)valveTemp);
+        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+    }
+    if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
+    {
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),(int)valveTemp);
+        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+    }
+
+    tempSensor.setWaitForConversion(false);
+    return valveTemp;
 }
 
 double getValvePressure(bool ignoreErrors = false)
@@ -979,11 +1008,10 @@ void stepFSM()
         case OnPressureTrigger_DrivingWater:
             {
                 static int lastHeaterTemp;
-                float valveTemp;
                 getHeaterTempIfNecessary(&lastHeaterTemp);
                 desiredTemp = getDesiredTemp(lastHeaterTemp);
 
-                if(getValveTempIfNecessary(&valveTemp))
+                if(getValveTempIfNecessary())
                 {
                     long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
                     debug(F("fadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
@@ -1004,9 +1032,7 @@ void stepFSM()
             break;
         case OnPressureTrigger_ServingWater:
             {
-                float valveTemp;
-
-                if(getValveTempIfNecessary(&valveTemp))
+                if(getValveTempIfNecessary())
                 {
                     debug(F("ServingWater\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
                     if(!isTriggerActive() && valveTemp < desiredTemp)
@@ -1150,6 +1176,8 @@ void setup()
           analogReference(INTERNAL);
         #endif
         tempSensor.begin();
+        tempSensor.setWaitForConversion(false);
+        VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ = DallasTemperature::millisToWaitForConversion(tempSensor.getResolution());
     #endif
 
     if(fallbackModeEnabled)
