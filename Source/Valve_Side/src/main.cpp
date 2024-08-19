@@ -1174,6 +1174,8 @@ void setup()
         rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
     #endif
 
+    Serial.print(F("\nINFO: RS485 COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
+
     #if !MOCK_SENSORS
         #ifdef __AVR_ATmega2560__
           analogReference(INTERNAL1V1);
