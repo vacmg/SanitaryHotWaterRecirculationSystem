@@ -77,6 +77,7 @@ unsigned long valveTempRequestTempMillis = 0;
 bool valveTempRequested = false;
 unsigned long VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ; // Updated to the real value at setup
 float valveTemp = 0;
+bool tempRequestReady = false;
 
 void stepFSM();
 [[noreturn]] void raiseError(ErrorCode error, const char* message = nullptr);
@@ -602,18 +603,24 @@ void requestValveTempIfNecessary()
     if((!valveTempRequested) && (millis() - valveTempRequestTempMillis > VALVE_TEMP_GATHERING_PERIOD))
     {
         valveTempRequestTempMillis = millis();
+        #if DEBUGTEMP
+            debug(F("Requesting temp at millis() = ")); debugln(valveTempRequestTempMillis);
+        #endif
         tempSensor.requestTemperatures();
         valveTempRequested = true;
     }
 #endif
 }
 
-bool getValveTempIfNecessary(bool ignoreErrors = false)
+void getValveTempIfNecessary(bool ignoreErrors = false)
 {
 #if !MOCK_SENSORS
     if((valveTempRequested) && (millis() - valveTempRequestTempMillis > VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ))
     {
         valveTemp = tempSensor.getTempCByIndex(0); // Obtain temp
+        #if DEBUGTEMP
+            debug(F("Temp read: ")); debugln(valveTemp);
+        #endif
 
         char errorBuff[ERROR_MESSAGE_SIZE];
         if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
@@ -627,11 +634,8 @@ bool getValveTempIfNecessary(bool ignoreErrors = false)
             raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
         }
         valveTempRequested = false;
-        return true;
+        tempRequestReady = true;
     }
-    return false;
-#else
-    return true;
 #endif
 }
 
@@ -1011,8 +1015,9 @@ void stepFSM()
                 getHeaterTempIfNecessary(&lastHeaterTemp);
                 desiredTemp = getDesiredTemp(lastHeaterTemp);
 
-                if(getValveTempIfNecessary())
+                if(tempRequestReady)
                 {
+                    tempRequestReady = false;
                     long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
                     debug(F("fadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
@@ -1032,8 +1037,9 @@ void stepFSM()
             break;
         case OnPressureTrigger_ServingWater:
             {
-                if(getValveTempIfNecessary())
+                if(tempRequestReady)
                 {
+                    tempRequestReady = false;
                     debug(F("ServingWater\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
                     if(!isTriggerActive() && valveTemp < desiredTemp)
                     {
@@ -1085,7 +1091,6 @@ void connectToHeater(bool ignoreErrors = false)
             if(strcmp(commsBuffer, OKCMD) == 0)
             {
                 connected = true;
-                Serial.println(F("Connection established with heater MCU"));
             }
             else if(!ignoreErrors)
             {
@@ -1117,7 +1122,7 @@ void connectToHeater(bool ignoreErrors = false)
     }
     else
     {
-        Serial.println(F("Connection established with heater MCU in ")); Serial.println(formattedTime(millis() - connectionPMillis, commsBuffer));
+        Serial.print(F("Connection established with heater MCU in ")); Serial.println(formattedTime(millis() - connectionPMillis, commsBuffer));
     }
     wdt_reset();
     delay(1000);
@@ -1225,6 +1230,7 @@ void setup()
     #endif
     Serial.println();
 
+    Serial.println(F("Error list:"));
     printErrorData();
 
     Serial.println();
@@ -1244,6 +1250,8 @@ void setup()
 void loop()
 {
     resetWatchdogsIfNecessary();
+    requestValveTempIfNecessary();
+    getValveTempIfNecessary(currentMode == ErrorFallBackMode);
     switch (readButton())
     {
         case NO_PULSE:

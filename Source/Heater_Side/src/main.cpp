@@ -60,6 +60,9 @@ void requestTempIfNecessary()
     if((!tempRequested) && (millis() - tempRequestTempMillis > HEATER_TEMP_GATHERING_PERIOD))
     {
         tempRequestTempMillis = millis();
+    #if DEBUGTEMP
+        debug(F("Requesting temp at millis() = ")); debugln(tempRequestTempMillis);
+    #endif
         tempSensor.requestTemperatures();
         tempRequested = true;
     }
@@ -72,6 +75,9 @@ void getTempIfNecessary()
     if((tempRequested) && (millis() - tempRequestTempMillis > TEMP_WAIT_FROM_REQUEST_TO_READ))
     {
         temp = tempSensor.getTempCByIndex(0);
+    #if DEBUGTEMP
+        debug(F("Temp read: ")); debugln(temp);
+    #endif
         tempRequested = false;
     }
     #endif

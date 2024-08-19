@@ -16,7 +16,8 @@
 #define VS "V2.0.0"
 
 #define DEBUG 1
-#define DEBUGWATCHDOG 1
+#define DEBUGWATCHDOG 0
+#define DEBUGTEMP 0
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
@@ -73,7 +74,7 @@ const int BUTTON_LONG_PRESSED_TIME = 2000; // 2 s
 const int BUTTON_SHORT_PRESSED_MIN_TIME = 100; // ms
 
 const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
-const int VALVE_TEMP_GATHERING_PERIOD = 1000; // 1 s
+const int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
 const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve
 const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich the systems closes the valve is desiredTemp*COLD_WATER_TEMPERATURE_MULTIPLIER
 

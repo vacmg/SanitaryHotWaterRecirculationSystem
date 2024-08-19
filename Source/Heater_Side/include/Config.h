@@ -16,7 +16,8 @@
 #define VS "V2.0.0"
 
 #define DEBUG 1
-#define DEBUGWATCHDOG 1
+#define DEBUGWATCHDOG 0
+#define DEBUGTEMP 0
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
