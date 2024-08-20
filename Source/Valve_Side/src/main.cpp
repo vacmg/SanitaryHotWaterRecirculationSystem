@@ -126,6 +126,8 @@ Color statusToColor(Status status)
         case ErrorFallBack_Begin:
         case ErrorFallBack:
             return ERROR_FALLBACK_COLOR;
+        case OnPressureTrigger_Begin:
+            return BOOT_COLOR;
         case OnPressureTrigger_WaitingCold:
             return WAITING_COLD_COLOR;
         case OnPressureTrigger_DrivingWater:
@@ -133,6 +135,7 @@ Color statusToColor(Status status)
         case OnPressureTrigger_ServingWater:
             return SERVING_WATER_COLOR;
         case AlwaysActive_Begin:
+            return BOOT_COLOR;
         case AlwaysActive_CirculatingWater:
             return CIRCULATING_WATER_COLOR;
         default:
