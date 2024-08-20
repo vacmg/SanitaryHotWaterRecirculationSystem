@@ -256,37 +256,54 @@ void resetWatchdogs()
         debugln(F("Watchdogs reset in progress..."));
     #endif
 
-    comms.sendCommand(WTDRSTCMD, nullptr, 0);
-    delay(WDT_RST_MESSAGE_PROCESSING_WAIT_TIME);
+    char errorBuff[ERROR_MESSAGE_SIZE];
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
-
-    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
-    if(res > 0)
+    ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
+    for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
     {
-        if(strcmp(commsBuffer, OKCMD) == 0)
+        #if DEBUGWATCHDOG
+            debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+        #endif
+        comms.sendCommand(WTDRSTCMD, nullptr, 0);
+        delay(WDT_RST_MESSAGE_PROCESSING_WAIT_TIME);
+
+        int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+        if(res > 0)
         {
-            #if DEBUGWATCHDOG
-                debugln(F("Watchdogs reset successfully"));
-            #endif
+            if(strcmp(commsBuffer, OKCMD) == 0)
+            {
+                #if DEBUGWATCHDOG
+                    debugln(F("Watchdogs reset successfully"));
+                #endif
+                err = NO_ERROR;
+            }
+            else if (currentMode != ErrorFallBackMode)
+            {
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+            }
         }
         else if (currentMode != ErrorFallBackMode)
         {
-            char errorBuff[ERROR_MESSAGE_SIZE];
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
-            raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
+            if(res == 0)
+            {
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Timeout receiving WTD-RST response"));
+                err = ERROR_COMMS_NO_RESPONSE;
+            }
+            else
+            {
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
+                err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+            }
         }
     }
-    else if (currentMode != ErrorFallBackMode)
+
+    if(err != NO_ERROR)
     {
-        if(res == 0)
-        {
-            raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving WTD-RST response"));
-        }
-        else
-        {
-            raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
-        }
+        raiseError(err, errorBuff);
     }
+
+
 }
 
 void resetWatchdogsIfNecessary()
@@ -458,14 +475,14 @@ void toggleFallbackMode(bool enableFallBackMode)
     raiseError(error, buff);
 }
 
-void handleHeaterError(char* buff = nullptr)
+void handleHeaterError(int retryCount, char* buff = nullptr)
 {
-    if(comms.getNextArgument(buff, SC_MAX_MESSAGE_SIZE) > 0)
+    if(retryCount>=COMMS_MAX_RETRIES)
     {
-        raiseError(ERROR_HEATER_MCU_ERROR, buff);
-    }
-    else
-    {
+        if(comms.getNextArgument(buff, SC_MAX_MESSAGE_SIZE) > 0)
+        {
+            raiseError(ERROR_HEATER_MCU_ERROR, buff);
+        }
         raiseError(ERROR_HEATER_MCU_ERROR); // TODO check why this is raised
     }
 }
@@ -493,7 +510,7 @@ void setPumpTimeout(long timeout)
         }
     #endif
 
-    comms.sendCommand(setPumpTimeoutCMD, argsPtr, 1);
+    comms.sendCommand(setPumpTimeoutCMD, argsPtr, 1); // As this is a config command, no retries are used, if the message is not received, both MCUs will reboot.
 
     delay(PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME);
     int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
@@ -540,7 +557,6 @@ void setValve(bool enable)
 
 void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrompa la memoria al recibir heater este mensaje
 {
-    char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     resetWatchdogs();
     const char* args[] = {"0"};
     if(enable)
@@ -550,50 +566,62 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
 
     debug(enable?F("Starting pump... "):F("Stopping pump... ")); if(ignoreErrors) {debug(F("Ignoring errors"));} debugln();
 
-    comms.sendCommand(pumpCMD, args, 1);
-    delay(PUMP_MESSAGE_PROCESSING_WAIT_TIME);
-    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
-    if(res > 0)
+    char errorBuff[ERROR_MESSAGE_SIZE];
+    char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
+    ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
+    for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
     {
-        if(strcmp(commsBuffer, OKCMD) == 0)
+        debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+        comms.sendCommand(pumpCMD, args, 1);
+        delay(PUMP_MESSAGE_PROCESSING_WAIT_TIME);
+        int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+        if(res > 0)
         {
-            debugln(enable?F("Pump started successfully"):F("Pump stopped successfully"));
-        }
-        else if(strcmp(commsBuffer, ERRCMD) == 0)
-        {
-            if(!ignoreErrors)
+            if(strcmp(commsBuffer, OKCMD) == 0)
             {
-                handleHeaterError(commsBuffer);
+                debugln(enable?F("Pump started successfully"):F("Pump stopped successfully"));
+                err = NO_ERROR;
             }
-            else if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+            else if(strcmp(commsBuffer, ERRCMD) == 0)
             {
-                debug(F("HEATER MCU returned the error: '")); debug(commsBuffer); debugln(F("', but it was ignored"));
+                if(!ignoreErrors)
+                {
+                    handleHeaterError(retries, commsBuffer);
+                }
+                else if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+                {
+                    debug(F("HEATER MCU returned the error: '")); debug(commsBuffer); debugln(F("', but it was ignored"));
+                }
+                else
+                {
+                    debugln(F("HEATER MCU returned an error, but it was ignored"));
+                }
+                err = NO_ERROR;
             }
             else
             {
-                debugln(F("HEATER MCU returned an error, but it was ignored"));
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
         }
-        else
+        else if(!ignoreErrors)
         {
-            char errorBuff[ERROR_MESSAGE_SIZE];
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
-            if(!ignoreErrors)
+            if(res == 0)
             {
-                raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Timeout receiving setPump response"));
+                err = ERROR_COMMS_NO_RESPONSE;
+            }
+            else
+            {
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
+                err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
         }
     }
-    else if(!ignoreErrors)
+
+    if(err != NO_ERROR)
     {
-        if(res == 0)
-        {
-            raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPump response"));
-        }
-        else
-        {
-            raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
-        }
+        raiseError(err, errorBuff);
     }
 }
 
@@ -691,34 +719,63 @@ bool isTriggerActive()
 
 int getHeaterTemp(bool ignoreErrors = false)
 {
-    char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     resetWatchdogs();
 
     if(!ignoreErrors)
     {
         debugln(F("Getting heater temp..."));
     }
-    comms.sendCommand(tempCMD, nullptr, 0);
-    delay(TEMP_MESSAGE_PROCESSING_WAIT_TIME);
-    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
-    if(res > 0)
+
+    char errorBuff[ERROR_MESSAGE_SIZE] = "";
+    char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
+    ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
+    for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
     {
-        if(strcmp(commsBuffer, tempCMD) == 0)
+        debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+        comms.sendCommand(tempCMD, nullptr, 0);
+        delay(TEMP_MESSAGE_PROCESSING_WAIT_TIME);
+        int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+        if(res > 0)
         {
-            if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+            if(strcmp(commsBuffer, tempCMD) == 0)
+            {
+                if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+                {
+                    if(!ignoreErrors)
+                    {
+                        debug(F("Heater temp received: "));
+                        debugln(commsBuffer);
+                    }
+                    return atoi(commsBuffer);
+                }
+                if(!ignoreErrors)
+                {
+                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("No temperature value received from the HEATER MCU"));
+                    err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                }
+            }
+            else if(strcmp(commsBuffer, ERRCMD) == 0)
             {
                 if(!ignoreErrors)
                 {
-                    debug(F("Heater temp received: "));
-                    debugln(commsBuffer);
+                    handleHeaterError(retries, commsBuffer);
                 }
-                return atoi(commsBuffer);
+                else if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+                {
+                    debug(F("HEATER MCU returned the error: '")); debug(commsBuffer); debugln(F("', but it was ignored"));
+                }
+                else
+                {
+                    debugln(F("HEATER MCU returned an error, but it was ignored"));
+                }
+                err = NO_ERROR;
             }
             else
             {
                 if(!ignoreErrors)
                 {
-                    raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("No temperature value received from the HEATER MCU"));
+                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                    err = ERROR_COMMS_UNEXPECTED_MESSAGE;
                 }
             }
         }
@@ -726,26 +783,25 @@ int getHeaterTemp(bool ignoreErrors = false)
         {
             if(!ignoreErrors)
             {
-                char errorBuff[ERROR_MESSAGE_SIZE];
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
-                raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
+                if(res == 0)
+                {
+                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Timeout receiving getTemp response"));
+                    err = ERROR_COMMS_NO_RESPONSE;
+                }
+                else
+                {
+                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
+                    err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                }
             }
         }
     }
-    else
+
+    if(err != NO_ERROR)
     {
-        if(!ignoreErrors)
-        {
-            if(res == 0)
-            {
-                raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving getTemp response"));
-            }
-            else
-            {
-                raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
-            }
-        }
+        raiseError(err, errorBuff);
     }
+
     return NAN;
 }
 
@@ -941,7 +997,7 @@ void handleCommsEvent()
             {
                 snprintf_P(commsBuffer, SC_MAX_MESSAGE_SIZE, PSTR("No error message provided"));
             }
-            handleHeaterError(commsBuffer);
+            handleHeaterError(COMMS_MAX_RETRIES, commsBuffer);
         }
         else
         {

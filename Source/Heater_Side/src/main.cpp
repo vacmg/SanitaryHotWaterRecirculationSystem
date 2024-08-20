@@ -184,7 +184,6 @@ void handleCommsEvent()
         if(strcmp(commsBuffer, pumpCMD) == 0)
         {
             debugln(F("PUMP CMD PARSED"));
-            wdt_reset();
 
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
             {
@@ -218,19 +217,13 @@ void handleCommsEvent()
             }
             else
             {
-                sprintf(commsBuffer, "No argument found in PUMP command");
-                Serial.print(F("ERROR: ")); Serial.println(commsBuffer);
-                const char* argsPtr[] = {commsBuffer};
-                comms.sendCommand(ERRCMD, argsPtr, 0);
-
-                Serial.println(F("Rebooting both MCUs"));
-                rebootLoop();
+                sprintf(commsBuffer, "");
+                Serial.print(F("ERROR: ")); Serial.println(F("No argument found in PUMP command: ignoring command"));
             }
         }
         else if(strcmp(commsBuffer, tempCMD) == 0)
         {
             debugln(F("TEMP CMD PARSED"));
-            wdt_reset();
 
             int temp = static_cast<int>(getTemp());
             debug(F("Current temp: ")); debugln(temp);
@@ -247,7 +240,6 @@ void handleCommsEvent()
         else if(strcmp(commsBuffer, setPumpTimeoutCMD) == 0)
         {
             debugln(F("DPT CMD PARSED"));
-            wdt_reset();
 
             if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE))
             {
@@ -265,7 +257,7 @@ void handleCommsEvent()
                 const char* argsPtr[] = {commsBuffer};
                 comms.sendCommand(ERRCMD, argsPtr, 0);
 
-                Serial.println(F("Rebooting both MCUs"));
+                Serial.println(F("Rebooting both MCUs")); // Because this command is a config one, if it fails, it's better to reboot both MCUs
                 rebootLoop();
             }
         }
