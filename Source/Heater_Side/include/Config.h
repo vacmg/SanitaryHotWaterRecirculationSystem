@@ -74,7 +74,7 @@ const int BUTTON_LONG_PRESSED_TIME = 2000; // 2 s
 const int BUTTON_SHORT_PRESSED_MIN_TIME = 100; // ms
 
 const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
-const int VALVE_TEMP_GATHERING_PERIOD = 1000; // 1 s
+const int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
 const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve
 const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich the systems closes the valve is desiredTemp*COLD_WATER_TEMPERATURE_MULTIPLIER
 
@@ -87,7 +87,7 @@ const double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
 const int COMMS_MAX_RETRIES = 3;
 const int RECEIVED_MESSAGE_TIMEOUT = 400; // 100 ms
 const int PUMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
-const int TEMP_MESSAGE_PROCESSING_WAIT_TIME = 2500;
+const int TEMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
 const int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 300;
 const int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 300;
 

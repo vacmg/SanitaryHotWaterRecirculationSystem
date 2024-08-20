@@ -256,7 +256,7 @@ void resetWatchdogs()
         debugln(F("Watchdogs reset in progress..."));
     #endif
 
-    char errorBuff[ERROR_MESSAGE_SIZE];
+    char errorBuff[ERROR_MESSAGE_SIZE] = "";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -566,7 +566,7 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
 
     debug(enable?F("Starting pump... "):F("Stopping pump... ")); if(ignoreErrors) {debug(F("Ignoring errors"));} debugln();
 
-    char errorBuff[ERROR_MESSAGE_SIZE];
+    char errorBuff[ERROR_MESSAGE_SIZE] = "";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
