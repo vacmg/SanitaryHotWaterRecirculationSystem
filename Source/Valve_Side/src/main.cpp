@@ -259,7 +259,7 @@ void resetWatchdogs()
         debugln(F("Watchdogs reset in progress..."));
     #endif
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "";
+    char errorBuff[ERROR_MESSAGE_SIZE] = "resetWatchdogs"; // TODO remove the string but leave ""
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -282,8 +282,12 @@ void resetWatchdogs()
             }
             else if (currentMode != ErrorFallBackMode)
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at resetWatchdogs: %s"), commsBuffer);
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+            }
+            else
+            {
+                err = NO_ERROR;
             }
         }
         else if (currentMode != ErrorFallBackMode)
@@ -299,14 +303,16 @@ void resetWatchdogs()
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
         }
+        else
+        {
+            err = NO_ERROR;
+        }
     }
 
     if(err != NO_ERROR)
     {
         raiseError(err, errorBuff);
     }
-
-
 }
 
 void resetWatchdogsIfNecessary()
@@ -539,7 +545,7 @@ void setPumpTimeout(long timeout)
         else
         {
             char errorBuff[ERROR_MESSAGE_SIZE];
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at setPumpTimeout: %s"), commsBuffer);
             raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
         }
     }
@@ -569,7 +575,7 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
 
     debug(enable?F("Starting pump... "):F("Stopping pump... ")); if(ignoreErrors) {debug(F("Ignoring errors"));} debugln();
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "";
+    char errorBuff[ERROR_MESSAGE_SIZE] = "setPump"; // TODO remove the string but leave ""
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -603,7 +609,7 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
             }
             else
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at setPump: %s"), commsBuffer);
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
         }
@@ -619,6 +625,10 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
                 snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
+        }
+        else
+        {
+            err = NO_ERROR;
         }
     }
 
@@ -729,7 +739,7 @@ int getHeaterTemp(bool ignoreErrors = false)
         debugln(F("Getting heater temp..."));
     }
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "";
+    char errorBuff[ERROR_MESSAGE_SIZE] = "getHeaterTemp"; // TODO remove the string but leave ""
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -756,6 +766,10 @@ int getHeaterTemp(bool ignoreErrors = false)
                     snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("No temperature value received from the HEATER MCU"));
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
                 }
+                else
+                {
+                    err = NO_ERROR;
+                }
             }
             else if(strcmp(commsBuffer, ERRCMD) == 0)
             {
@@ -777,8 +791,12 @@ int getHeaterTemp(bool ignoreErrors = false)
             {
                 if(!ignoreErrors)
                 {
-                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at getHeaterTemp: %s"), commsBuffer);
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                }
+                else
+                {
+                    err = NO_ERROR;
                 }
             }
         }
@@ -796,6 +814,10 @@ int getHeaterTemp(bool ignoreErrors = false)
                     snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
                 }
+            }
+            else
+            {
+                err = NO_ERROR;
             }
         }
     }
@@ -1154,17 +1176,15 @@ void connectToHeater(bool ignoreErrors = false)
             else if(!ignoreErrors)
             {
                 char errorBuff[ERROR_MESSAGE_SIZE];
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU: %s"), commsBuffer);
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at connectToHeater: %s"), commsBuffer);
                 raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
             }
         }
         else
         {
-            if(!ignoreErrors)
-            {
-                raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout connecting to heater"));
-            }
-
+            #if DEBUGWATCHDOG
+                debugln(F("Timeout receiving WTD-RST response, ignoring it"));
+            #endif
         }
     }
 

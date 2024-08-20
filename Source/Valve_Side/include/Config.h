@@ -139,6 +139,8 @@ const char* getErrorName(ErrorCode error)
             return "ERROR_COMMS_UNEXPECTED_MESSAGE";
         case ERROR_HEATER_MCU_ERROR:
             return "ERROR_HEATER_MCU_ERROR";
+        case ENUM_LEN:
+            return "__[BUG]__ENUM_LEN"; // TODO remove this element
         default:
             return "Unknown Error";
     }
