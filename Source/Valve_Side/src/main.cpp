@@ -531,7 +531,7 @@ void setPumpTimeout(long timeout)
         }
         else if(strcmp(commsBuffer, ERRCMD) == 0)
         {
-            handleHeaterError(commsBuffer);
+            handleHeaterError(COMMS_MAX_RETRIES, commsBuffer);
         }
         else
         {
