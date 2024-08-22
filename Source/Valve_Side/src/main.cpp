@@ -860,6 +860,7 @@ void printSystemInfo()
     Serial.print(F(    "Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - millis(), buff));
     Serial.print(F(    "Watchdogs reset period: ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
     Serial.print(F(    "FallBack Mode ")); Serial.println(currentMode==ErrorFallBackMode?"Enabled":"Disabled");
+    Serial.print(F(    "Comms max retries: ")); Serial.println(COMMS_MAX_RETRIES);
     Serial.print(F(    "Error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
     Serial.print(F(    "Comms message max length: ")); Serial.println(SC_MAX_MESSAGE_SIZE);
     Serial.print(F(    "Mode: ")); Serial.println(modeToString(currentMode));
