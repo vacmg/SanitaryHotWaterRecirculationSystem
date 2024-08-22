@@ -11,7 +11,7 @@
 #endif
 
 
-#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enablefallback' or 'disablefallback' to enable or disable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'changemode' to change the operation mode to the next one (similar to pressing the button);\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
+#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enable' or 'disable' to disable or enable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'changemode' to change the operation mode to the next one (similar to pressing the button);\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
 #define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as the valve temp\n"
 
 const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
@@ -52,7 +52,7 @@ typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 typedef enum {OnPressureTrigger = 0, AlwaysActive, NUM_OF_MODES, ErrorFallBackMode} Mode; // Mode of the system
 #define changeMode(newMode) do {debug(F("Changing Mode from ")); debug(modeToString(currentMode)); currentMode = newMode; debug(F(" to ")); debugln(modeToString(currentMode)); changeStatus(getBeginStatus(currentMode));} while(0)
 
-typedef enum {ErrorFallBack_Begin, ErrorFallBack, OnPressureTrigger_Begin, OnPressureTrigger_WaitingCold, OnPressureTrigger_DrivingWater, OnPressureTrigger_ServingWater, AlwaysActive_Begin, AlwaysActive_CirculatingWater} Status;
+typedef enum {ErrorFallBack_Begin, ErrorFallBack, OnPressureTrigger_Begin, OnPressureTrigger_WaitingCold, OnPressureTrigger_TransitionToDrivingWater, OnPressureTrigger_DrivingWater, OnPressureTrigger_ServingWater, AlwaysActive_Begin, AlwaysActive_CirculatingWater} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(currentStatus)); currentStatus = newStatus; writeColor(statusToColor(currentStatus)); debug(F(" to ")); debugln(statusToString(currentStatus));} while(0)
 
 Mode currentMode = ErrorFallBackMode;
@@ -69,6 +69,7 @@ bool triggerVal = false;
 
 unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
+unsigned long timeBeforeDrivingWaterMillis = 0;
 
 int progressMinTemp = 0;
 int desiredTemp = 0;
@@ -130,6 +131,7 @@ Color statusToColor(Status status)
             return BOOT_COLOR;
         case OnPressureTrigger_WaitingCold:
             return WAITING_COLD_COLOR;
+        case OnPressureTrigger_TransitionToDrivingWater:
         case OnPressureTrigger_DrivingWater:
             return DRIVING_WATER_COLOR;
         case OnPressureTrigger_ServingWater:
@@ -170,6 +172,8 @@ const char* statusToString(Status status)
             return "OnPressureTrigger_Begin";
         case OnPressureTrigger_WaitingCold:
             return "OnPressureTrigger_WaitingCold";
+        case OnPressureTrigger_TransitionToDrivingWater:
+            return "OnPressureTrigger_TransitionToDrivingWater";
         case OnPressureTrigger_DrivingWater:
             return "OnPressureTrigger_DrivingWater";
         case OnPressureTrigger_ServingWater:
@@ -299,7 +303,7 @@ void resetWatchdogs()
             }
             else
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header in resetWatchdogs"));
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
         }
@@ -503,7 +507,6 @@ void setPumpTimeout(long timeout)
         timeout = 0;
     }
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
-    resetWatchdogs();
     char args[12];
     snprintf(args, 12, "%ld", timeout);
     const char* argsPtr[] = {args};
@@ -555,7 +558,7 @@ void setPumpTimeout(long timeout)
     }
     else
     {
-        raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header"));
+        raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header in setPumpTimeout"));
     }
 }
 
@@ -566,7 +569,6 @@ void setValve(bool enable)
 
 void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrompa la memoria al recibir heater este mensaje
 {
-    resetWatchdogs();
     const char* args[] = {"0"};
     if(enable)
     {
@@ -622,7 +624,7 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
             }
             else
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
+                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header in setPump"));
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
             }
         }
@@ -732,8 +734,6 @@ bool isTriggerActive()
 
 int getHeaterTemp(bool ignoreErrors = false)
 {
-    resetWatchdogs();
-
     if(!ignoreErrors)
     {
         debugln(F("Getting heater temp..."));
@@ -759,7 +759,7 @@ int getHeaterTemp(bool ignoreErrors = false)
                         debug(F("Heater temp received: "));
                         debugln(commsBuffer);
                     }
-                    return atoi(commsBuffer);
+                    return atoi(commsBuffer); // TODO sanitize heater temperature
                 }
                 if(!ignoreErrors)
                 {
@@ -811,7 +811,7 @@ int getHeaterTemp(bool ignoreErrors = false)
                 }
                 else
                 {
-                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header"));
+                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header in getTemp"));
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
                 }
             }
@@ -923,18 +923,19 @@ void serialEvent()
     else if(strstr(buffer,"clear") != nullptr)
     {
         invalidateErrorData();
+        Serial.println(F("Error list cleared"));
     }
     else if(strstr(buffer,"errorlist") != nullptr)
     {
         printErrorData();
     }
-    else if(strstr(buffer,"enablefallback") != nullptr)
-    {
-        toggleFallbackMode(true);
-    }
-    else if(strstr(buffer,"disablefallback") != nullptr)
+    else if(strstr(buffer,"enable") != nullptr)
     {
         toggleFallbackMode(false);
+    }
+    else if(strstr(buffer,"disable") != nullptr)
+    {
+        toggleFallbackMode(true);
     }
     else if(strstr(buffer,"sensors") != nullptr)
     {
@@ -1082,6 +1083,14 @@ void stepFSM()
             {
                 setPump(true);
 
+                timeBeforeDrivingWaterMillis = millis();
+
+                changeStatus(OnPressureTrigger_TransitionToDrivingWater);
+            }
+            break;
+        case OnPressureTrigger_TransitionToDrivingWater:
+            if(millis() - timeBeforeDrivingWaterMillis > TRANSITION_TO_DRIVING_WATER_TIME)
+            {
                 heaterTempPMillis = 0;
                 valveTempPMillis = 0;
 
@@ -1132,7 +1141,7 @@ void stepFSM()
 
             }
             break;
-        case AlwaysActive_Begin: // TODO probar este modo
+        case AlwaysActive_Begin: // TODO cambiar el algoritmo para que mantenga la temperatura deseada, no la bomba funcionando siempre
             setPumpTimeout(0);
             setPump(true);
             setValve(true);
@@ -1263,7 +1272,7 @@ void setup()
         #endif
         tempSensor.begin();
         tempSensor.setWaitForConversion(false);
-        VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ = DallasTemperature::millisToWaitForConversion(tempSensor.getResolution());
+        VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ = TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME + DallasTemperature::millisToWaitForConversion(tempSensor.getResolution());
     #endif
 
     if(fallbackModeEnabled)

@@ -292,7 +292,7 @@ void setup()
     #if !MOCK_SENSORS
         tempSensor.begin();
         tempSensor.setWaitForConversion(false);
-        TEMP_WAIT_FROM_REQUEST_TO_READ = DallasTemperature::millisToWaitForConversion(tempSensor.getResolution());
+        TEMP_WAIT_FROM_REQUEST_TO_READ = TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME + DallasTemperature::millisToWaitForConversion(tempSensor.getResolution());
     #endif
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
@@ -315,6 +315,7 @@ void setup()
     #endif
 
     delay(1000);
+    wdt_reset();
 }
 
 void loop()
@@ -325,5 +326,5 @@ void loop()
     handleCommsEvent();
     autoDisablePumpIfTimeout();
 
-    delay(100);
+    //delay(100); // TODO check if this delay is necessary
 }
