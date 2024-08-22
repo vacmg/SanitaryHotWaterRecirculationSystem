@@ -1086,6 +1086,7 @@ void stepFSM()
                 timeBeforeDrivingWaterMillis = millis();
 
                 changeStatus(OnPressureTrigger_TransitionToDrivingWater);
+                debug(F("Waiting ")); debug(TRANSITION_TO_DRIVING_WATER_TIME/1000); debugln(F(" seconds to get accurate temperature readings"));
             }
             break;
         case OnPressureTrigger_TransitionToDrivingWater:
