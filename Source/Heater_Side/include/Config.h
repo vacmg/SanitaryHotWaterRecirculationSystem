@@ -18,6 +18,7 @@
 #define DEBUG 1
 #define DEBUGWATCHDOG 0
 #define DEBUGTEMP 0
+#define DEBUGCONNECT 0
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
@@ -68,7 +69,6 @@ const int ANIMATION_FRAME_DELAY = 2; // ms
 const int FADE_MIN_TEMP_OFFSET = 2;
 
 const long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
-const long INIT_CONNECTION_TIMEOUT_FALLBACK = 12000; // 12 sec
 const long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
 
 const int BUTTON_LONG_PRESSED_TIME = 2000; // 2 s
@@ -91,8 +91,8 @@ const int COMMS_MAX_RETRIES = 5;
 const int RECEIVED_MESSAGE_TIMEOUT = 400; // 100 ms
 const int PUMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
 const int TEMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
-const int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 300;
-const int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 300;
+const int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 400;
+const int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 400;
 
 // Command structure: "{HEADER}{CMD$}[ARG$]*"
 char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages

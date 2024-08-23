@@ -161,114 +161,118 @@ void autoDisablePumpIfTimeout()
 
 void handleCommsEvent()
 {
-    int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
-    if(res > 0)
+    if(comms.available())
     {
-        #if !DISABLE_WATCHDOGS
-        if(strcmp(commsBuffer, WTDRSTCMD) == 0)
+        delay(100);
+        int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
+        if(res > 0)
         {
-            wdt_reset();
-            #if DEBUGWATCHDOG
+            #if !DISABLE_WATCHDOGS
+            if(strcmp(commsBuffer, WTDRSTCMD) == 0)
+            {
+                wdt_reset();
+                #if DEBUGWATCHDOG
                 debugln(F("Watchdog Reset CMD PARSED"));
                 debugln(F("Sending OK CMD"));
-            #endif
+                #endif
 
-            comms.sendCommand(OKCMD, nullptr, 0);
+                comms.sendCommand(OKCMD, nullptr, 0);
 
-            #if DEBUGWATCHDOG
+                #if DEBUGWATCHDOG
                 debugln(F("Watchdog reset command processed"));
-            #endif
-        }
-        else
-        #endif
-        if(strcmp(commsBuffer, pumpCMD) == 0)
-        {
-            debugln(F("PUMP CMD PARSED"));
-
-            if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+                #endif
+            }
+            else
+                    #endif
+            if(strcmp(commsBuffer, pumpCMD) == 0)
             {
-                debug(F("Enable:\t")); debugln(commsBuffer);
+                debugln(F("PUMP CMD PARSED"));
 
-                if(atoi(commsBuffer))
+                if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
                 {
-                    pumpPMillis = millis();
-                    pumpEnabled = true;
-                    digitalWrite(pumpRelayPin, RELAY_ENABLED);
+                    debug(F("Enable:\t")); debugln(commsBuffer);
 
-                    debug(F("Starting pump at millis() = ")); debugln(pumpPMillis);
-                    debug(F("Max pump on time: ")); debugln(formattedTime(autoDisablePumpTimeout, commsBuffer));
+                    if(atoi(commsBuffer))
+                    {
+                        pumpPMillis = millis();
+                        pumpEnabled = true;
+                        digitalWrite(pumpRelayPin, RELAY_ENABLED);
+
+                        debug(F("Starting pump at millis() = ")); debugln(pumpPMillis);
+                        debug(F("Max pump on time: ")); debugln(formattedTime(autoDisablePumpTimeout, commsBuffer));
+                    }
+                    else
+                    {
+                        debug(F("Stopping pump at millis() = ")); debugln(millis());
+                        digitalWrite(pumpRelayPin, RELAY_DISABLED);
+
+                        if(pumpEnabled)
+                        {
+                            debug(F("Elapsed time = "));
+                            debugln(formattedTime(millis() - pumpPMillis, commsBuffer));
+                        }
+                        pumpEnabled = false;
+                    }
+
+                    debugln(F("Sending OK CMD"));
+                    comms.sendCommand(OKCMD, nullptr, 0);
+                    debugln(F("Pump command processed"));
                 }
                 else
                 {
-                    debug(F("Stopping pump at millis() = ")); debugln(millis());
-                    digitalWrite(pumpRelayPin, RELAY_DISABLED);
-
-                    if(pumpEnabled)
-                    {
-                        debug(F("Elapsed time = "));
-                        debugln(formattedTime(millis() - pumpPMillis, commsBuffer));
-                    }
-                    pumpEnabled = false;
+                    sprintf(commsBuffer, "");
+                    Serial.print(F("ERROR: ")); Serial.println(F("No argument found in PUMP command: ignoring command"));
                 }
+            }
+            else if(strcmp(commsBuffer, tempCMD) == 0)
+            {
+                debugln(F("TEMP CMD PARSED"));
 
-                debugln(F("Sending OK CMD"));
-                comms.sendCommand(OKCMD, nullptr, 0);
-                debugln(F("Pump command processed"));
+                int temp = static_cast<int>(getTemp());
+                debug(F("Current temp: ")); debugln(temp);
+
+                char tempStr[10];
+                sprintf(tempStr, "%d", temp);
+                const char* argsPtr[] = {tempStr};
+
+                debug(F("Sending TEMP CMD ANSWER: ")); debugln(tempStr);
+                comms.sendCommand(tempCMD, argsPtr, 1);
+                debugln(F("Temp sent"));
+
+            }
+            else if(strcmp(commsBuffer, setPumpTimeoutCMD) == 0)
+            {
+                debugln(F("DPT CMD PARSED"));
+
+                if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE))
+                {
+                    autoDisablePumpTimeout = atol(commsBuffer);
+                    debug(F("New pump timeout: ")); debugln(autoDisablePumpTimeout);
+
+                    debugln(F("Sending OK CMD"));
+                    comms.sendCommand(OKCMD, nullptr, 0);
+                    debugln(F("Pump timeout updated"));
+                }
+                else
+                {
+                    sprintf(commsBuffer, "No argument found in DPT command");
+                    Serial.print(F("ERROR: ")); Serial.println(commsBuffer);
+                    const char* argsPtr[] = {commsBuffer};
+                    comms.sendCommand(ERRCMD, argsPtr, 0);
+
+                    Serial.println(F("Rebooting both MCUs")); // Because this command is a config one, if it fails, it's better to reboot both MCUs
+                    rebootLoop();
+                }
             }
             else
             {
-                sprintf(commsBuffer, "");
-                Serial.print(F("ERROR: ")); Serial.println(F("No argument found in PUMP command: ignoring command"));
+                Serial.print(F("WARNING: Unknown command: ")); Serial.println(commsBuffer);
             }
         }
-        else if(strcmp(commsBuffer, tempCMD) == 0)
+        else if(res < 0)
         {
-            debugln(F("TEMP CMD PARSED"));
-
-            int temp = static_cast<int>(getTemp());
-            debug(F("Current temp: ")); debugln(temp);
-
-            char tempStr[10];
-            sprintf(tempStr, "%d", temp);
-            const char* argsPtr[] = {tempStr};
-
-            debug(F("Sending TEMP CMD ANSWER: ")); debugln(tempStr);
-            comms.sendCommand(tempCMD, argsPtr, 1);
-            debugln(F("Temp sent"));
-
+            Serial.println(F("WARNING: Message header could not be parsed and was discarded"));
         }
-        else if(strcmp(commsBuffer, setPumpTimeoutCMD) == 0)
-        {
-            debugln(F("DPT CMD PARSED"));
-
-            if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE))
-            {
-                autoDisablePumpTimeout = atol(commsBuffer);
-                debug(F("New pump timeout: ")); debugln(autoDisablePumpTimeout);
-
-                debugln(F("Sending OK CMD"));
-                comms.sendCommand(OKCMD, nullptr, 0);
-                debugln(F("Pump timeout updated"));
-            }
-            else
-            {
-                sprintf(commsBuffer, "No argument found in DPT command");
-                Serial.print(F("ERROR: ")); Serial.println(commsBuffer);
-                const char* argsPtr[] = {commsBuffer};
-                comms.sendCommand(ERRCMD, argsPtr, 0);
-
-                Serial.println(F("Rebooting both MCUs")); // Because this command is a config one, if it fails, it's better to reboot both MCUs
-                rebootLoop();
-            }
-        }
-        else
-        {
-            Serial.print(F("WARNING: Unknown command: ")); Serial.println(commsBuffer);
-        }
-    }
-    else if(res < 0)
-    {
-        Serial.println(F("WARNING: Message header could not be parsed and was discarded"));
     }
 }
 
@@ -325,6 +329,4 @@ void loop()
 
     handleCommsEvent();
     autoDisablePumpIfTimeout();
-
-    //delay(100); // TODO check if this delay is necessary
 }

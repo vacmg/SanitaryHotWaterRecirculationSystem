@@ -1161,16 +1161,14 @@ void connectToHeater(bool ignoreErrors = false)
     unsigned long connectionPMillis = millis();
     bool connected = false;
 
-    long timeout = currentMode == ErrorFallBackMode ? INIT_CONNECTION_TIMEOUT_FALLBACK : INIT_CONNECTION_TIMEOUT;
+    Serial.print(F("Connecting to heater MCU...\tTimeout in ")); Serial.println(formattedTime(INIT_CONNECTION_TIMEOUT, commsBuffer));
 
-    Serial.print(F("Connecting to heater MCU...\tTimeout in ")); Serial.println(formattedTime(timeout, commsBuffer));
-
-    while(!connected && (millis() - connectionPMillis < timeout))
+    while(!connected && (millis() - connectionPMillis < INIT_CONNECTION_TIMEOUT))
     {
         wdt_reset();
         delay(20);
 
-        #if DEBUGWATCHDOG
+        #if DEBUGCONNECT
         debugln(F("Sending Watchdog Reset CMD: "));
         #endif
 
@@ -1191,11 +1189,16 @@ void connectToHeater(bool ignoreErrors = false)
                 raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
             }
         }
+        #if DEBUGCONNECT
         else
         {
-            #if DEBUGWATCHDOG
-                debugln(F("Timeout receiving WTD-RST response, ignoring it"));
-            #endif
+            debugln(F("Timeout receiving WTD-RST response, ignoring it"));
+        }
+        #endif
+
+        if(Serial.available())
+        {
+            serialEvent();
         }
     }
 
