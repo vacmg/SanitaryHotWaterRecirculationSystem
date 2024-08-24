@@ -322,9 +322,6 @@ void setup()
 
     loadProfilerData();
     printProfilerData();
-
-    delay(1000);
-    wdt_reset();
 }
 
 void loop()
