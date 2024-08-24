@@ -51,7 +51,7 @@ typedef struct
 #define COLOR_GREEN_AS_RGB {0,255,0}
 #define COLOR_BLUE_AS_RGB {0,0,255}
 #define COLOR_YELLOW_AS_RGB {255,255,0}
-#define COLOR_ORANGE_AS_RGB {255,50,0}
+#define COLOR_ORANGE_AS_RGB {255,20,0}
 #define COLOR_PURPLE_AS_RGB {255,0,255}
 #define COLOR_CYAN_AS_RGB {0,255,255}
 #define COLOR_WHITE_AS_RGB {255,255,255}
@@ -906,7 +906,7 @@ bool getHeaterTempIfNecessary(int* temp)
 
 int getDesiredTemp(int heaterTemp)
 {
-    if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_GettingHotWater)
+    if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_Idle)
     {
         return roundf(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
     }
@@ -1192,7 +1192,7 @@ void stepFSM()
 
 
         case AlwaysActive_Begin:
-            setPumpTimeout(0);
+            setPumpTimeout(AUTO_DISABLE_PUMP_TIMEOUT);
             setPump(true);
             setValve(false);
 
@@ -1245,10 +1245,9 @@ void stepFSM()
             {
                 tempRequestReady = false;
                 long progress = map(static_cast<long>(valveTemp), desiredTemp, progressMinTemp, 0, 100);
-                debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
+                debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
                 if(!isTriggerActive() && valveTemp < desiredTemp)
                 {
-                    setValve(false);
                     changeStatus(AlwaysActive_TransitionToGettingHotWater);
                     timeBeforeGettingHeaterTempMillis = millis();
                     debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
