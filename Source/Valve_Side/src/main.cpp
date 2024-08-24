@@ -1504,6 +1504,7 @@ void loop()
                 saveProfilerData();
                 break;
             default:
+                break;
         }
     #endif
 }
