@@ -37,14 +37,33 @@ DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 MAX_RS485 rs485(&Serial1, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Create rs485 instance
 SimpleComms comms(&rs485, HEADER); // Create comms instance
 
-typedef enum {Black, Red, Green, Blue, Yellow, Purple, Cyan, White, Gray} Color;
+typedef enum {Black, Red, Green, Blue, Yellow, Orange, Purple, Cyan, White, Gray} Color;
+
+typedef struct
+{
+    byte r;
+    byte g;
+    byte b;
+} RGBColor;
+
+#define COLOR_BLACK_AS_RGB {0,0,0}
+#define COLOR_RED_AS_RGB {255,0,0}
+#define COLOR_GREEN_AS_RGB {0,255,0}
+#define COLOR_BLUE_AS_RGB {0,0,255}
+#define COLOR_YELLOW_AS_RGB {255,255,0}
+#define COLOR_ORANGE_AS_RGB {255,50,0}
+#define COLOR_PURPLE_AS_RGB {255,0,255}
+#define COLOR_CYAN_AS_RGB {0,255,255}
+#define COLOR_WHITE_AS_RGB {255,255,255}
+#define COLOR_GRAY_AS_RGB {1,1,1}
+
 #define BOOT_COLOR Green
 #define USER_ACK_COLOR Cyan
 #define ERROR_FALLBACK_COLOR Yellow
 #define WAITING_COLD_COLOR Gray
 #define DRIVING_WATER_COLOR Blue
 #define SERVING_WATER_COLOR Red
-#define CIRCULATING_WATER_COLOR White
+#define ALWAYS_ACTIVE_WATER_COLOR Orange
 #define WDT_BOOT_DELAY_COLOR Cyan
 
 typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
@@ -52,7 +71,7 @@ typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 typedef enum {OnPressureTrigger = 0, AlwaysActive, NUM_OF_MODES, ErrorFallBackMode} Mode; // Mode of the system
 #define changeMode(newMode) do {debug(F("Changing Mode from ")); debug(modeToString(currentMode)); currentMode = newMode; debug(F(" to ")); debugln(modeToString(currentMode)); changeStatus(getBeginStatus(currentMode));} while(0)
 
-typedef enum {ErrorFallBack_Begin, ErrorFallBack, OnPressureTrigger_Begin, OnPressureTrigger_WaitingCold, OnPressureTrigger_TransitionToDrivingWater, OnPressureTrigger_DrivingWater, OnPressureTrigger_ServingWater, AlwaysActive_Begin, AlwaysActive_CirculatingWater} Status;
+typedef enum {ErrorFallBack_Begin, ErrorFallBack, OnPressureTrigger_Begin, OnPressureTrigger_WaitingCold, OnPressureTrigger_TransitionToDrivingWater, OnPressureTrigger_DrivingWater, OnPressureTrigger_ServingWater, AlwaysActive_Begin, AlwaysActive_TransitionToGettingHotWater, AlwaysActive_GettingHotWater, AlwaysActive_Idle} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(currentStatus)); currentStatus = newStatus; writeColor(statusToColor(currentStatus)); debug(F(" to ")); debugln(statusToString(currentStatus));} while(0)
 
 Mode currentMode = ErrorFallBackMode;
@@ -69,7 +88,7 @@ bool triggerVal = false;
 
 unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
-unsigned long timeBeforeDrivingWaterMillis = 0;
+unsigned long timeBeforeGettingHeaterTempMillis = 0;
 
 int progressMinTemp = 0;
 int desiredTemp = 0;
@@ -138,8 +157,10 @@ Color statusToColor(Status status)
             return SERVING_WATER_COLOR;
         case AlwaysActive_Begin:
             return BOOT_COLOR;
-        case AlwaysActive_CirculatingWater:
-            return CIRCULATING_WATER_COLOR;
+        case AlwaysActive_Idle:
+        case AlwaysActive_TransitionToGettingHotWater:
+        case AlwaysActive_GettingHotWater:
+            return ALWAYS_ACTIVE_WATER_COLOR;
         default:
             return Black; // Return Black color for unknown status
     }
@@ -180,8 +201,12 @@ const char* statusToString(Status status)
             return "OnPressureTrigger_ServingWater";
         case AlwaysActive_Begin:
             return "AlwaysActive_Begin";
-        case AlwaysActive_CirculatingWater:
-            return "AlwaysActive_CirculatingWater";
+        case AlwaysActive_GettingHotWater:
+            return "AlwaysActive_GettingHotWater";
+        case AlwaysActive_TransitionToGettingHotWater:
+            return "AlwaysActive_TransitionToGettingHotWater";
+        case AlwaysActive_Idle:
+            return "AlwaysActive_Idle";
         default:
             return "Unknown Status";
     }
@@ -206,6 +231,35 @@ const char* formattedTime(long milliseconds, char* buff)
     return buff;
 }
 
+RGBColor getRGBColor(const Color color)
+{
+    switch (color)
+    {
+        case Black:
+            return COLOR_BLACK_AS_RGB;
+        case Red:
+            return COLOR_RED_AS_RGB;
+        case Green:
+            return COLOR_GREEN_AS_RGB;
+        case Blue:
+            return COLOR_BLUE_AS_RGB;
+        case Yellow:
+            return COLOR_YELLOW_AS_RGB;
+        case Orange:
+            return COLOR_ORANGE_AS_RGB;
+        case Purple:
+            return COLOR_PURPLE_AS_RGB;
+        case Cyan:
+            return COLOR_CYAN_AS_RGB;
+        case White:
+            return COLOR_WHITE_AS_RGB;
+        case Gray:
+            return COLOR_GRAY_AS_RGB;
+    }
+
+    return COLOR_BLACK_AS_RGB;
+}
+
 void writeColor(uint8_t r, uint8_t g, uint8_t b)
 {
     #if LED_ENABLED
@@ -219,38 +273,46 @@ void writeColor(uint8_t r, uint8_t g, uint8_t b)
     #endif
 }
 
-void writeColor(Color color)
+void writeColor(const RGBColor& color)
 {
-    switch(color)
+    writeColor(color.r, color.g, color.b);
+}
+
+void writeColor(const Color color)
+{
+    writeColor(getRGBColor(color));
+}
+
+RGBColor getShadeFromColor(const RGBColor& color, float shadeProportion)
+{
+    shadeProportion = constrain(shadeProportion, 0.0, 1.0);
+    return {static_cast<byte>(color.r*shadeProportion), static_cast<byte>(color.g*shadeProportion), static_cast<byte>(color.b*shadeProportion)};
+}
+
+void fadeAnimationStep(const RGBColor& baseColor, float fadeAmountPerFrame)
+{
+    static bool increasing = true;
+    static float fade = 0.0;
+
+    if(increasing)
     {
-        case Black:
-            writeColor(0,0,0);
-            break;
-        case Red:
-            writeColor(255,0,0);
-            break;
-        case Green:
-            writeColor(0,255,0);
-            break;
-        case Blue:
-            writeColor(0,0,255);
-            break;
-        case Yellow:
-            writeColor(255,255,0);
-            break;
-        case Purple:
-            writeColor(255,0,255);
-            break;
-        case Cyan:
-            writeColor(0,255,255);
-            break;
-        case White:
-            writeColor(255,255,255);
-            break;
-        case Gray:
-            writeColor(1,1,1);
-            break;
+        fade += fadeAmountPerFrame;
+        if(fade >= 1.0)
+        {
+            fade = 1.0;
+            increasing = false;
+        }
     }
+    else
+    {
+        fade -= fadeAmountPerFrame;
+        if(fade <= 0.0)
+        {
+            fade = 0.0;
+            increasing = true;
+        }
+    }
+    writeColor(getShadeFromColor(baseColor, fade));
 }
 
 #if !DISABLE_WATCHDOGS
@@ -844,13 +906,13 @@ bool getHeaterTempIfNecessary(int* temp)
 
 int getDesiredTemp(int heaterTemp)
 {
-    if(currentStatus == OnPressureTrigger_ServingWater)
+    if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_GettingHotWater)
     {
-        return round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
+        return roundf(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
     }
     else
     {
-        return round(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
+        return roundf(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
     }
 }
 
@@ -1020,7 +1082,7 @@ void handleCommsEvent()
     {
         if(strcmp(commsBuffer, ERRCMD) == 0)
         {
-            if(!comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
+            if(comms.getNextArgument(commsBuffer, SC_MAX_MESSAGE_SIZE) <= 0)
             {
                 snprintf_P(commsBuffer, SC_MAX_MESSAGE_SIZE, PSTR("No error message provided"));
             }
@@ -1039,8 +1101,6 @@ void handleCommsEvent()
 
 void stepFSM()
 {
-    char commsBuffer[SC_MAX_MESSAGE_SIZE+1];
-
     switch(currentStatus)
     {
         case ErrorFallBack_Begin:
@@ -1048,50 +1108,36 @@ void stepFSM()
             setValve(true);
             changeStatus(ErrorFallBack);
             break;
+
         case ErrorFallBack:
             {
-                static byte brightness = 255;
-                static bool increasing = false;
-                if(increasing)
-                {
-                    brightness++;
-                    if(brightness == 255)
-                    {
-                        increasing = false;
-                    }
-                }
-                else
-                {
-                    brightness--;
-                    if(brightness == 0)
-                    {
-                        increasing = true;
-                    }
-                }
-
-                writeColor(brightness, brightness, 0);
-                delay(ANIMATION_FRAME_DELAY);
+                fadeAnimationStep(getRGBColor(Yellow),FALLBACK_MODE_ANIMATION_BRIGHTNESS_STEP);
+                delay(FALLBACK_MODE_ANIMATION_FRAME_DELAY);
             }
             break;
+
+
         case OnPressureTrigger_Begin:
             setPump(false);
             setPumpTimeout(AUTO_DISABLE_PUMP_TIMEOUT);
             setValve(false);
             changeStatus(OnPressureTrigger_WaitingCold);
             break;
+
         case OnPressureTrigger_WaitingCold:
             if(isTriggerActive())
             {
                 setPump(true);
 
-                timeBeforeDrivingWaterMillis = millis();
-
                 changeStatus(OnPressureTrigger_TransitionToDrivingWater);
-                debug(F("Waiting ")); debug(TRANSITION_TO_DRIVING_WATER_TIME/1000); debugln(F(" seconds to get accurate temperature readings"));
+                timeBeforeGettingHeaterTempMillis = millis();
+                debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
+                progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
             }
             break;
+
         case OnPressureTrigger_TransitionToDrivingWater:
-            if(millis() - timeBeforeDrivingWaterMillis > TRANSITION_TO_DRIVING_WATER_TIME)
+            if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
             {
                 heaterTempPMillis = 0;
                 valveTempPMillis = 0;
@@ -1101,6 +1147,7 @@ void stepFSM()
                 changeStatus(OnPressureTrigger_DrivingWater);
             }
             break;
+
         case OnPressureTrigger_DrivingWater:
             {
                 static int lastHeaterTemp;
@@ -1111,7 +1158,7 @@ void stepFSM()
                 {
                     tempRequestReady = false;
                     long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
-                    debug(F("fadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
+                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     writeColor(progress, 0, 255-progress);
 
@@ -1123,33 +1170,93 @@ void stepFSM()
                         changeStatus(OnPressureTrigger_ServingWater);
 
                         desiredTemp = getDesiredTemp(getHeaterTemp()); // TODO quizas esta seccion tarda demasiado?
+                        progressMinTemp = static_cast<int>(valveTemp);
                     }
                 }
             }
             break;
+
         case OnPressureTrigger_ServingWater:
             {
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    debug(F("ServingWater\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
+                    long progress = map(static_cast<long>(valveTemp), desiredTemp, progressMinTemp, 0, 100);
+                    debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
                     if(!isTriggerActive() && valveTemp < desiredTemp)
                     {
                         setValve(false);
-
                         changeStatus(OnPressureTrigger_WaitingCold);
                     }
                 }
-
             }
             break;
-        case AlwaysActive_Begin: // TODO cambiar el algoritmo para que mantenga la temperatura deseada, no la bomba funcionando siempre
+
+
+        case AlwaysActive_Begin:
             setPumpTimeout(0);
             setPump(true);
-            setValve(true);
-            changeStatus(AlwaysActive_CirculatingWater);
+            setValve(false);
+
+            changeStatus(AlwaysActive_TransitionToGettingHotWater);
+            timeBeforeGettingHeaterTempMillis = millis();
+            debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
+            progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
+        break;
+
+        case AlwaysActive_TransitionToGettingHotWater:
+            if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
+            {
+                changeStatus(AlwaysActive_GettingHotWater);
+
+                heaterTempPMillis = 0;
+                valveTempPMillis = 0;
+            }
             break;
-        case AlwaysActive_CirculatingWater:
+
+        case AlwaysActive_GettingHotWater:
+            {
+                static int lastHeaterTemp;
+                getHeaterTempIfNecessary(&lastHeaterTemp);
+                desiredTemp = getDesiredTemp(lastHeaterTemp);
+
+                fadeAnimationStep(getRGBColor(ALWAYS_ACTIVE_WATER_COLOR), ALWAYS_ACTIVE_MODE_ANIMATION_BRIGHTNESS_STEP);
+
+                if(tempRequestReady)
+                {
+                    tempRequestReady = false;
+                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
+                    debug(statusToString(currentStatus));debug(F("\tinitialTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
+
+                    if(valveTemp >= desiredTemp)
+                    {
+                        setPump(false);
+                        setValve(true);
+
+                        changeStatus(AlwaysActive_Idle);
+
+                        desiredTemp = getDesiredTemp(getHeaterTemp()); // TODO quizas esta seccion tarda demasiado?
+                        progressMinTemp = static_cast<int>(valveTemp);
+                    }
+                }
+            }
+            break;
+
+        case AlwaysActive_Idle:
+            if(tempRequestReady)
+            {
+                tempRequestReady = false;
+                long progress = map(static_cast<long>(valveTemp), desiredTemp, progressMinTemp, 0, 100);
+                debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
+                if(!isTriggerActive() && valveTemp < desiredTemp)
+                {
+                    setValve(false);
+                    changeStatus(AlwaysActive_TransitionToGettingHotWater);
+                    timeBeforeGettingHeaterTempMillis = millis();
+                    debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
+                    progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
+                }
+            }
             break;
     }
 }
