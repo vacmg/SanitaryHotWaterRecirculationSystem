@@ -12,6 +12,7 @@
 #endif
 
 #include <Arduino.h>
+#include <EEPROM.h>
 
 #define VS "V2.0.0"
 
@@ -19,6 +20,7 @@
 #define DEBUGWATCHDOG 0
 #define DEBUGTEMP 0
 #define DEBUGCONNECT 0
+#define PROFILER_ENABLED 1
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU.
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
@@ -29,6 +31,8 @@
 #define EEPROM_FALLBACK_MODE_ENABLED_ADDRESS 8
 #define EEPROM_ERROR_START_ADDRESS 16
 #define ERROR_MESSAGE_SIZE 128
+#define PROFILER_DATA_START_ADDRESS 700
+#define PROFILER_DATA_MSG_SIZE 64
 
 typedef enum {NO_ERROR = 0, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_COMMS_CONNECTION_NOT_ESTABLISHED, ERROR_COMMS_NO_RESPONSE, ERROR_COMMS_UNEXPECTED_MESSAGE, ERROR_HEATER_MCU_ERROR,             ENUM_LEN} ErrorCode;
 typedef struct
@@ -152,5 +156,89 @@ inline const char* getErrorName(ErrorCode error)
             return "Unknown Error";
     }
 }
+
+#if PROFILER_ENABLED
+unsigned long profilerMillis = 0;
+
+typedef struct
+{
+    unsigned long valid;
+    unsigned long minTime;
+    unsigned long maxTime;
+    char minTimeData[PROFILER_DATA_MSG_SIZE];
+    char maxTimeData[PROFILER_DATA_MSG_SIZE];
+} ProfilerData;
+
+constexpr ProfilerData defaultProfilerData = {0XABDCEF12, INT32_MAX, 0, "", ""};
+ProfilerData profilerData = defaultProfilerData;
+
+inline void profilerStartMeasure()
+{
+    profilerMillis = millis();
+}
+
+inline int profilerEndMeasure()
+{
+    profilerMillis = millis() - profilerMillis;
+    int updated = 0;
+    if(profilerMillis < profilerData.minTime)
+    {
+        profilerData.minTime = profilerMillis;
+        updated = -1;
+    }
+    if(profilerMillis > profilerData.maxTime)
+    {
+        profilerData.maxTime = profilerMillis;
+        updated = 1;
+    }
+    return updated;
+}
+
+inline void saveProfilerData()
+{
+    EEPROM.put(PROFILER_DATA_START_ADDRESS, profilerData);
+}
+
+inline void clearProfilerData()
+{
+    profilerData = defaultProfilerData;
+    saveProfilerData();
+}
+
+inline void loadProfilerData()
+{
+    EEPROM.get(PROFILER_DATA_START_ADDRESS, profilerData);
+    if(profilerData.valid != defaultProfilerData.valid)
+    {
+        clearProfilerData();
+    }
+}
+
+inline void printProfilerData()
+{
+    Serial.println("Profiler Data:");
+    Serial.print("Min Time: ");
+    Serial.println(profilerData.minTime);
+    Serial.print("Max Time: ");
+    Serial.println(profilerData.maxTime);
+    Serial.print("Min Time Data: ");
+    Serial.println(profilerData.minTimeData);
+    Serial.print("Max Time Data: ");
+    Serial.println(profilerData.maxTimeData);
+    Serial.println();
+}
+#else
+
+inline void loadProfilerData()
+{
+    unsigned long invalid = 0;
+    EEPROM.put(PROFILER_DATA_START_ADDRESS, invalid);
+}
+
+inline void printProfilerData()
+{
+    Serial.println("Profiler is disabled.");
+}
+#endif
 
 #endif

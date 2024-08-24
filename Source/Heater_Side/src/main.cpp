@@ -33,6 +33,7 @@ unsigned long TEMP_WAIT_FROM_REQUEST_TO_READ; // Updated to the real value at se
 float temp = 0;
 
 char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
+char lastCommand[PROFILER_DATA_MSG_SIZE] = "";
 
 
 const char* formattedTime(long milliseconds, char* buff)
@@ -167,6 +168,8 @@ void handleCommsEvent()
         int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
         if(res > 0)
         {
+            strncpy(lastCommand, commsBuffer, PROFILER_DATA_MSG_SIZE);
+            lastCommand[PROFILER_DATA_MSG_SIZE-1] = '\0';
             #if !DISABLE_WATCHDOGS
             if(strcmp(commsBuffer, WTDRSTCMD) == 0)
             {
@@ -317,15 +320,47 @@ void setup()
         Serial.println(F("WARNING: SENSOR MOCKING ENABLED"));
     #endif
 
+    loadProfilerData();
+    printProfilerData();
+
     delay(1000);
     wdt_reset();
 }
 
 void loop()
 {
+    #if PROFILER_ENABLED
+        profilerStartMeasure();
+    #endif
+
     requestTempIfNecessary();
     getTempIfNecessary();
 
     handleCommsEvent();
     autoDisablePumpIfTimeout();
+
+    #if PROFILER_ENABLED
+        int profilerRes = profilerEndMeasure();
+
+        switch (profilerRes)
+        {
+            case 1:
+                strncpy(profilerData.maxTimeData, lastCommand, PROFILER_DATA_MSG_SIZE);
+                #if DEBUG
+                    debugln(F("Max time reached in this iteration"));
+                    printProfilerData();
+                #endif
+                saveProfilerData();
+                break;
+            case -1:
+                strncpy(profilerData.maxTimeData, lastCommand, PROFILER_DATA_MSG_SIZE);
+                #if DEBUG
+                    debugln(F("Min time reached in this iteration"));
+                    printProfilerData();
+                #endif
+                saveProfilerData();
+                break;
+            default:
+        }
+    #endif
 }

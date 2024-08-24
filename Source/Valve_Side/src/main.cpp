@@ -1429,6 +1429,9 @@ void setup()
     #endif
     Serial.println();
 
+    loadProfilerData();
+    printProfilerData();
+
     Serial.println(F("Error list:"));
     printErrorData();
 
@@ -1448,6 +1451,10 @@ void setup()
 
 void loop()
 {
+    #if PROFILER_ENABLED
+        profilerStartMeasure();
+    #endif
+
     resetWatchdogsIfNecessary();
     requestValveTempIfNecessary();
     getValveTempIfNecessary(currentMode == ErrorFallBackMode);
@@ -1473,5 +1480,30 @@ void loop()
     handleCommsEvent();
     #if ENABLE_AUTO_RESTART
         checkResetTime();
+    #endif
+
+    #if PROFILER_ENABLED
+        int profilerRes = profilerEndMeasure();
+
+        switch (profilerRes)
+        {
+            case 1:
+                sprintf(profilerData.maxTimeData, "Status: %s", statusToString(currentStatus));
+                #if DEBUG
+                    debugln(F("Max time reached in this iteration"));
+                    printProfilerData();
+                #endif
+                saveProfilerData();
+                break;
+            case -1:
+                sprintf(profilerData.minTimeData, "Status: %s", statusToString(currentStatus));
+                #if DEBUG
+                        debugln(F("Min time reached in this iteration"));
+                        printProfilerData();
+                #endif
+                saveProfilerData();
+                break;
+            default:
+        }
     #endif
 }
