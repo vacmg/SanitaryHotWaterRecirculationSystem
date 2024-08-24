@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "Config.h"
-#include<avr/wdt.h> /* Header for watchdog timers in AVR */
+#include<avr/wdt.h> /* Header for watchdog timers in AVR*/
 #include <EEPROM.h>
 #include <MAX_RS485.h>
 #include "SimpleComms.h"
@@ -14,21 +14,21 @@
 #define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enable' or 'disable' to disable or enable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'changemode' to change the operation mode to the next one (similar to pressing the button);\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
 #define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as the valve temp\n"
 
-const uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
-const uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
+constexpr uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
+constexpr uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
 
-const uint8_t VALVE_RELAY_PIN = 2;
+constexpr uint8_t VALVE_RELAY_PIN = 2;
 // const uint8_t VALVE_FEEDBACK_PIN = 7;
 
-const uint8_t RED_LED_PIN = 11;
-const uint8_t GREEN_LED_PIN = 9;
-const uint8_t BLUE_LED_PIN = 10;
+constexpr uint8_t RED_LED_PIN = 11;
+constexpr uint8_t GREEN_LED_PIN = 9;
+constexpr uint8_t BLUE_LED_PIN = 10;
 
-const uint8_t BUTTON_PIN = 8;
+constexpr uint8_t BUTTON_PIN = 8;
 
 #if !MOCK_SENSORS
-const uint8_t PRESSURE_SENSOR = A0;
-const uint8_t TEMP_SENSOR = 12;
+constexpr uint8_t PRESSURE_SENSOR = A0;
+constexpr uint8_t TEMP_SENSOR = 12;
 
 OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
 DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
@@ -722,7 +722,7 @@ void getValveTempIfNecessary(bool ignoreErrors = false)
 #if !MOCK_SENSORS
     if((valveTempRequested) && (millis() - valveTempRequestTempMillis > VALVE_TEMP_WAIT_FROM_REQUEST_TO_READ))
     {
-        valveTemp = tempSensor.getTempCByIndex(0); // Obtain temp
+        valveTemp = tempSensor.getTempCByIndex(0); // Get temp
         #if DEBUGTEMP
             debug(F("Temp read: ")); debugln(valveTemp);
         #endif
@@ -730,12 +730,12 @@ void getValveTempIfNecessary(bool ignoreErrors = false)
         char errorBuff[ERROR_MESSAGE_SIZE];
         if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
         {
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),(int)valveTemp);
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
             raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
         }
         if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
         {
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),(int)valveTemp);
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
             raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
         }
         valveTempRequested = false;
@@ -754,12 +754,12 @@ float getValveTemp(bool ignoreErrors = false)
     char errorBuff[ERROR_MESSAGE_SIZE];
     if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),(int)valveTemp);
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
         raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
     }
     if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),(int)valveTemp);
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
         raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
     }
 
@@ -777,7 +777,7 @@ double getValvePressure(bool ignoreErrors = false)
     if(!ignoreErrors && !(pressureSensorCurrent >= MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA && pressureSensorCurrent <= MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA))
     {
         char errorBuff[ERROR_MESSAGE_SIZE];
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("PRESSURE CURRENT (%dmA) IS OUTSIDE THE RANGE (%d, %d)mA"),(int)pressureSensorCurrent, (int)MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA, (int)MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA);
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("PRESSURE CURRENT (%dmA) IS OUTSIDE THE RANGE (%d, %d)mA"),static_cast<int>(pressureSensorCurrent), static_cast<int>(MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA), static_cast<int>(MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA));
         raiseError(ERROR_PRESSURE_SENSOR_INVALID_VALUE,errorBuff);
     }
 
@@ -889,7 +889,7 @@ int getHeaterTemp(bool ignoreErrors = false)
         raiseError(err, errorBuff);
     }
 
-    return NAN;
+    return 0;
 }
 
 bool getHeaterTempIfNecessary(int* temp)
@@ -919,7 +919,7 @@ int getDesiredTemp(int heaterTemp)
 void printSystemInfo()
 {
     char buff[64];
-    Serial.print(F(    "Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - millis(), buff));
+    Serial.print(F(    "Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - static_cast<long>(millis()), buff));
     Serial.print(F(    "Watchdogs reset period: ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
     Serial.print(F(    "FallBack Mode ")); Serial.println(currentMode==ErrorFallBackMode?"Enabled":"Disabled");
     Serial.print(F(    "Comms max retries: ")); Serial.println(COMMS_MAX_RETRIES);
@@ -1142,8 +1142,6 @@ void stepFSM()
                 heaterTempPMillis = 0;
                 valveTempPMillis = 0;
 
-                progressMinTemp = getValveTemp() - FADE_MIN_TEMP_OFFSET;
-
                 changeStatus(OnPressureTrigger_DrivingWater);
             }
             break;
@@ -1322,7 +1320,7 @@ void connectToHeater(bool ignoreErrors = false)
     }
     else
     {
-        Serial.print(F("Connection established with heater MCU in ")); Serial.println(formattedTime(millis() - connectionPMillis, commsBuffer));
+        Serial.print(F("Connection established with heater MCU in ")); Serial.println(formattedTime(static_cast<long>(millis() - connectionPMillis), commsBuffer));
     }
     wdt_reset();
     delay(1000);
@@ -1331,7 +1329,7 @@ void connectToHeater(bool ignoreErrors = false)
 
 void setup()
 {
-    wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
+    wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds*/
 
     pinMode(VALVE_RELAY_PIN,OUTPUT);
     bool fallbackModeEnabled;
@@ -1347,13 +1345,13 @@ void setup()
     writeColor(WDT_BOOT_DELAY_COLOR);
 
     #if !DISABLE_WATCHDOGS
-    delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration. */
-    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+    delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely if wrong configuration.*/
+    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds*/
     #endif
 
     writeColor(BOOT_COLOR);
 
-    Serial.begin(SERIAL_USB_BAUD_RATE); // Used for debug purposes
+    Serial.begin(SERIAL_USB_BAUD_RATE); // Used for debug
     delay(3000);
     Serial.println(F("\n------------------------------------------"  ));
     Serial.println(F(  "|                SHWRS-VS                |"  ));
@@ -1369,9 +1367,9 @@ void setup()
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
         Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR RS485 COMMUNICATION OVER SERIAL1"));
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT, SERIAL_7N1); // The first argument is serial baud rate & second one is the serial input timeout (to enable the use of the find function), third argument is hardware serial options.
+        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT, SERIAL_7N1); // The first argument is serial baud rate & the second one is the serial input timeout (to enable the find function), third argument is hardware serial options.
     #else
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & the second one is the serial input timeout (to enable the find function)
     #endif
 
     Serial.print(F("\nINFO: RS485 COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));

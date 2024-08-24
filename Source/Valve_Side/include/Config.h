@@ -19,7 +19,7 @@
 #define DEBUGWATCHDOG 0
 #define DEBUGTEMP 0
 #define DEBUGCONNECT 0
-#define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU
+#define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU.
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
 #define ENABLE_AUTO_RESTART 1
@@ -48,60 +48,64 @@ typedef struct
 #define BTN_PRESSED 1
 #define BTN_RELEASED !BTN_PRESSED
 
-#define SC_MAX_MESSAGE_SIZE 127 // Real message size is SC_MAX_MESSAGE_SIZE+1, but the last byte is reserved for the null terminator
+#define SC_MAX_MESSAGE_SIZE 127 // Real message size is SC_MAX_MESSAGE_SIZE+1, but the last byte is reserved for the null terminator.
 
 
-const uint32_t SERIAL_USB_BAUD_RATE = 115200;
-const uint32_t RS485_SERIAL_BAUD_RATE = 9600;
+constexpr uint32_t SERIAL_USB_BAUD_RATE = 115200;
+constexpr uint32_t RS485_SERIAL_BAUD_RATE = 9600;
 
-const float MIN_ALLOWED_TEMP = 10; // 0ºC
-const float MAX_ALLOWED_TEMP = 67; // 67ºc
-const float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
-const float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
+constexpr float MIN_ALLOWED_TEMP = 10; // 0ºC
+constexpr float MAX_ALLOWED_TEMP = 67; // 67ºc
+constexpr float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
+constexpr float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
-const int WATCHDOG_RESET_PERIOD = 5000; // 5 s
-const long SYSTEM_RESET_PERIOD = 86400000; // 24 h
+constexpr int WATCHDOG_RESET_PERIOD = 5000; // 5 s
+constexpr long SYSTEM_RESET_PERIOD = 86400000; // 24 h
 constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 10000; // 10 s
 
-const int MIN_PROGRESS_VALUE = 0; // [0-255]
-const int MAX_PROGRESS_VALUE = 200; // [0-255]
-const int ANIMATION_FRAME_DELAY = 2; // ms
-const int FADE_MIN_TEMP_OFFSET = 2;
+constexpr int MIN_PROGRESS_VALUE = 0; // [0-255]
+constexpr int MAX_PROGRESS_VALUE = 200; // [0-255]
+constexpr int FADE_MIN_TEMP_OFFSET = 2;
 
-const long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
-const long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
+constexpr int FALLBACK_MODE_ANIMATION_FRAME_DELAY = 2; // ms
+constexpr int ALWAYS_ACTIVE_MODE_ANIMATION_FRAME_DELAY = 2; // ms
+constexpr float FALLBACK_MODE_ANIMATION_BRIGHTNESS_STEP = 0.01; // [0-1]
+constexpr float ALWAYS_ACTIVE_MODE_ANIMATION_BRIGHTNESS_STEP = 0.01; // [0-1]
 
 constexpr long INIT_CONNECTION_TIMEOUT = 120000; // 2 min
 constexpr long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
 
-const int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // 100 ms
+constexpr int BUTTON_LONG_PRESSED_TIME = 2000; // 2 s
+constexpr int BUTTON_SHORT_PRESSED_MIN_TIME = 100; // ms
 
-const int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
-const int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
-const float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve
-const float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature at wich the systems closes the valve is desiredTemp*COLD_WATER_TEMPERATURE_MULTIPLIER
+constexpr int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // 100 ms
 
-const double PRESSURE_SENSOR_MIN_BAR = 0.0;
-const double PRESSURE_SENSOR_MAX_BAR = 10.0;
-const double WATER_MIN_NORMAL_PRESSURE_BAR = 2.75;
-const double PRESSURE_SENSOR_CURRENT_MIN_mA = 3.6;
-const double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
+constexpr int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
+constexpr int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
+constexpr float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve.
+constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature when the systems close the valve is desiredTemp×COLD_WATER_TEMPERATURE_MULTIPLIER
 
-const int COMMS_MAX_RETRIES = 5;
-const int RECEIVED_MESSAGE_TIMEOUT = 400; // 100 ms
-const int PUMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
-const int TEMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
-const int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 400;
-const int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 400;
+constexpr double PRESSURE_SENSOR_MIN_BAR = 0.0;
+constexpr double PRESSURE_SENSOR_MAX_BAR = 10.0;
+constexpr double WATER_MIN_NORMAL_PRESSURE_BAR = 2.75;
+constexpr double PRESSURE_SENSOR_CURRENT_MIN_mA = 3.6;
+constexpr double PRESSURE_SENSOR_CURRENT_MAX_mA = 19.5;
+
+constexpr int COMMS_MAX_RETRIES = 5;
+constexpr int RECEIVED_MESSAGE_TIMEOUT = 400; // 400 ms // This is the time the system waits for a message to be completely received.
+constexpr int PUMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
+constexpr int TEMP_MESSAGE_PROCESSING_WAIT_TIME = 400;
+constexpr int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 400;
+constexpr int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 400;
 
 // Command structure: "{HEADER}{CMD$}[ARG$]*"
-char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages
-const char pumpCMD[] = "PUMP";
-const char tempCMD[] = "TMP";
-const char OKCMD[] = "OK";
-const char WTDRSTCMD[] = "WTD-RST";
-const char ERRCMD[] = "ERROR";
-const char setPumpTimeoutCMD[] = "SPT";
+char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages.
+constexpr char pumpCMD[] = "PUMP";
+constexpr char tempCMD[] = "TMP";
+constexpr char OKCMD[] = "OK";
+constexpr char WTDRSTCMD[] = "WTD-RST";
+constexpr char ERRCMD[] = "ERROR";
+constexpr char setPumpTimeoutCMD[] = "SPT";
 
 
 #if DEBUG
@@ -113,7 +117,7 @@ const char setPumpTimeoutCMD[] = "SPT";
 #endif
 
 
-[[noreturn]] void rebootLoop()
+[[noreturn]] inline void rebootLoop()
 {
     wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
 
@@ -124,7 +128,7 @@ const char setPumpTimeoutCMD[] = "SPT";
     }
 }
 
-const char* getErrorName(ErrorCode error)
+inline const char* getErrorName(ErrorCode error)
 {
     switch(error)
     {

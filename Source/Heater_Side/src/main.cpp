@@ -9,12 +9,12 @@
 #endif
 
 
-const uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
-const uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
-const uint8_t pumpRelayPin = 7; // Pump relay pin
+constexpr uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
+constexpr uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
+constexpr uint8_t pumpRelayPin = 7; // Pump relay pin
 
 #if !MOCK_SENSORS
-    const uint8_t TEMP_SENSOR = 12;
+constexpr uint8_t TEMP_SENSOR = 12;
 
     OneWire oneWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
     DallasTemperature tempSensor(&oneWire); // Create temp sensor instance
@@ -25,7 +25,7 @@ SimpleComms comms(&rs485, HEADER);
 
 bool pumpEnabled = false;
 unsigned long pumpPMillis = 0;
-long autoDisablePumpTimeout = AUTO_DISABLE_PUMP_TIMEOUT;
+unsigned long autoDisablePumpTimeout = AUTO_DISABLE_PUMP_TIMEOUT;
 
 unsigned long tempRequestTempMillis = 0;
 bool tempRequested = false;
@@ -220,7 +220,6 @@ void handleCommsEvent()
                 }
                 else
                 {
-                    sprintf(commsBuffer, "");
                     Serial.print(F("ERROR: ")); Serial.println(F("No argument found in PUMP command: ignoring command"));
                 }
             }
@@ -260,7 +259,7 @@ void handleCommsEvent()
                     const char* argsPtr[] = {commsBuffer};
                     comms.sendCommand(ERRCMD, argsPtr, 0);
 
-                    Serial.println(F("Rebooting both MCUs")); // Because this command is a config one, if it fails, it's better to reboot both MCUs
+                    Serial.println(F("Rebooting both MCUs")); // Because this command is a config one, if it fails, it is better to reboot both MCUs.
                     rebootLoop();
                 }
             }
@@ -278,10 +277,10 @@ void handleCommsEvent()
 
 void setup()
 {
-    wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds */
+    wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds.*/
     #if !DISABLE_WATCHDOGS
-        delay(10000); /* Done so that the Arduino doesn't keep resetting infinitely in case of wrong configuration */
-        wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
+        delay(10000); /* This delay is used to avoid the arduino from being stuck in a bootloop without time to reflash it between loops.*/
+        wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds.*/
     #endif
 
     pinMode(pumpRelayPin,OUTPUT);
@@ -301,9 +300,9 @@ void setup()
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
         Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR RS485 COMMUNICATION OVER SERIAL1"));
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT, SERIAL_7N1); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function), third argument is hardware serial options
+        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT, SERIAL_7N1); // first argument is serial baud rate & second one is the serial input timeout (to enable the find function), third argument is hardware serial options.
     #else
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is serial input timeout (to enable the use of the find function)
+        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & second one is the serial input timeout (to enable the find function)
     #endif
 
     Serial.print(F("\nINFO: RS485 COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
