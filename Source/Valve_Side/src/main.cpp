@@ -403,7 +403,7 @@ ButtonStatus readButton()
     {
         unsigned long time = millis();
         delay(10);
-        while(!digitalRead(BUTTON_PIN) && millis() - time < BUTTON_LONG_PRESSED_TIME)
+        while(digitalRead(BUTTON_PIN) == BTN_PRESSED && millis() - time < BUTTON_LONG_PRESSED_TIME)
         {
             #if !DISABLE_WATCHDOGS
             resetWatchdogsIfNecessary();
