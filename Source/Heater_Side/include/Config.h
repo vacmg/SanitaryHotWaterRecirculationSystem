@@ -86,8 +86,8 @@ constexpr int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // 100 ms
 
 constexpr int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 constexpr int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
-constexpr float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.85; // 85% of the temperature at the heater should get into the valve.
-constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.9; // The temperature when the systems close the valve is desiredTemp×COLD_WATER_TEMPERATURE_MULTIPLIER
+constexpr float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.75; // 85% of the temperature at the heater should get into the valve.
+constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.93; // The temperature when the systems close the valve is desiredTemp×COLD_WATER_TEMPERATURE_MULTIPLIER
 
 constexpr double PRESSURE_SENSOR_MIN_BAR = 0.0;
 constexpr double PRESSURE_SENSOR_MAX_BAR = 10.0;
@@ -150,8 +150,6 @@ inline const char* getErrorName(ErrorCode error)
             return "ERROR_COMMS_UNEXPECTED_MESSAGE";
         case ERROR_HEATER_MCU_ERROR:
             return "ERROR_HEATER_MCU_ERROR";
-        case ENUM_LEN:
-            return "__[BUG]__ENUM_LEN"; // TODO remove this element
         default:
             return "Unknown Error";
     }

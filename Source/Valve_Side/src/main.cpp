@@ -91,7 +91,7 @@ unsigned long valveTempPMillis = 0;
 unsigned long timeBeforeGettingHeaterTempMillis = 0;
 
 int progressMinTemp = 0;
-int desiredTemp = 0;
+float desiredTemp = 0;
 
 unsigned long valveTempRequestTempMillis = 0;
 bool valveTempRequested = false;
@@ -325,7 +325,7 @@ void resetWatchdogs()
         debugln(F("Watchdogs reset in progress..."));
     #endif
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "resetWatchdogs"; // TODO remove the string but leave ""
+    char errorBuff[ERROR_MESSAGE_SIZE] = "resetWatchdogs - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -558,7 +558,7 @@ void handleHeaterError(int retryCount, char* buff = nullptr)
         {
             raiseError(ERROR_HEATER_MCU_ERROR, buff);
         }
-        raiseError(ERROR_HEATER_MCU_ERROR); // TODO check why this is raised
+        raiseError(ERROR_HEATER_MCU_ERROR);
     }
 }
 
@@ -629,7 +629,7 @@ void setValve(bool enable)
     digitalWrite(VALVE_RELAY_PIN, enable?RELAY_ENABLED:RELAY_DISABLED);
 }
 
-void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrompa la memoria al recibir heater este mensaje
+void setPump(bool enable, bool ignoreErrors = false)
 {
     const char* args[] = {"0"};
     if(enable)
@@ -639,7 +639,7 @@ void setPump(bool enable, bool ignoreErrors = false) // TODO Puede que se corrom
 
     debug(enable?F("Starting pump... "):F("Stopping pump... ")); if(ignoreErrors) {debug(F("Ignoring errors"));} debugln();
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "setPump"; // TODO remove the string but leave ""
+    char errorBuff[ERROR_MESSAGE_SIZE] = "setPump - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -754,12 +754,12 @@ float getValveTemp(bool ignoreErrors = false)
     char errorBuff[ERROR_MESSAGE_SIZE];
     if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
         raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
     }
     if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
+        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
         raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
     }
 
@@ -801,7 +801,7 @@ int getHeaterTemp(bool ignoreErrors = false)
         debugln(F("Getting heater temp..."));
     }
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "getHeaterTemp"; // TODO remove the string but leave ""
+    char errorBuff[ERROR_MESSAGE_SIZE] = "getHeaterTemp - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
@@ -821,7 +821,18 @@ int getHeaterTemp(bool ignoreErrors = false)
                         debug(F("Heater temp received: "));
                         debugln(commsBuffer);
                     }
-                    return atoi(commsBuffer); // TODO sanitize heater temperature
+                    const long temp = strtol(commsBuffer, nullptr, 10);
+                    if(!ignoreErrors && static_cast<float>(temp) < MIN_ALLOWED_TEMP)
+                    {
+                        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("HEATER TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
+                        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+                    }
+                    if(!ignoreErrors && static_cast<float>(temp) > MAX_ALLOWED_TEMP)
+                    {
+                        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("HEATER TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
+                        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+                    }
+                    return static_cast<int>(temp);
                 }
                 if(!ignoreErrors)
                 {
@@ -904,7 +915,7 @@ bool getHeaterTempIfNecessary(int* temp)
     return false;
 }
 
-int getDesiredTemp(int heaterTemp)
+float getDesiredTemp(const int heaterTemp)
 {
     if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_Idle)
     {
@@ -1167,7 +1178,7 @@ void stepFSM()
 
                         changeStatus(OnPressureTrigger_ServingWater);
 
-                        desiredTemp = getDesiredTemp(getHeaterTemp()); // TODO quizas esta seccion tarda demasiado?
+                        desiredTemp = getDesiredTemp(getHeaterTemp());
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
                 }
@@ -1223,7 +1234,7 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
+                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, static_cast<long>(desiredTemp), MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
                     debug(statusToString(currentStatus));debug(F("\tinitialTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     if(valveTemp >= desiredTemp)
@@ -1233,7 +1244,7 @@ void stepFSM()
 
                         changeStatus(AlwaysActive_Idle);
 
-                        desiredTemp = getDesiredTemp(getHeaterTemp()); // TODO quizas esta seccion tarda demasiado?
+                        desiredTemp = getDesiredTemp(getHeaterTemp());
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
                 }
@@ -1244,7 +1255,7 @@ void stepFSM()
             if(tempRequestReady)
             {
                 tempRequestReady = false;
-                long progress = map(static_cast<long>(valveTemp), desiredTemp, progressMinTemp, 0, 100);
+                long progress = map(static_cast<long>(valveTemp), static_cast<long>(desiredTemp), progressMinTemp, 0, 100);
                 debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
                 if(!isTriggerActive() && valveTemp < desiredTemp)
                 {
