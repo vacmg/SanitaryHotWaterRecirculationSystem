@@ -58,8 +58,8 @@ typedef struct
 constexpr uint32_t SERIAL_USB_BAUD_RATE = 115200;
 constexpr uint32_t RS485_SERIAL_BAUD_RATE = 9600;
 
-constexpr float MIN_ALLOWED_TEMP = 10; // 0ºC
-constexpr float MAX_ALLOWED_TEMP = 67; // 67ºc
+constexpr float MIN_ALLOWED_TEMP = 6; // 6ºC
+constexpr float MAX_ALLOWED_TEMP = 70; // 70ºc
 constexpr float MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 2.5; // mA
 constexpr float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
@@ -68,7 +68,7 @@ constexpr long SYSTEM_RESET_PERIOD = 86400000; // 24 h
 constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 10000; // 10 s
 
 constexpr int MIN_PROGRESS_VALUE = 0; // [0-255]
-constexpr int MAX_PROGRESS_VALUE = 200; // [0-255]
+constexpr int MAX_PROGRESS_VALUE = 220; // [0-255]
 constexpr int FADE_MIN_TEMP_OFFSET = 2;
 
 constexpr int FALLBACK_MODE_ANIMATION_FRAME_DELAY = 2; // ms
@@ -82,12 +82,12 @@ constexpr long AUTO_DISABLE_PUMP_TIMEOUT = 150000; // 2.5 min
 constexpr int BUTTON_LONG_PRESSED_TIME = 2000; // 2 s
 constexpr int BUTTON_SHORT_PRESSED_MIN_TIME = 100; // ms
 
-constexpr int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // 100 ms
+constexpr int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // ms
 
 constexpr int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 constexpr int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
-constexpr float PIPE_HEAT_TRANSPORT_EFFICIENCY = 0.75; // 85% of the temperature at the heater should get into the valve.
-constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.93; // The temperature when the systems close the valve is desiredTemp×COLD_WATER_TEMPERATURE_MULTIPLIER
+constexpr float HOT_WATER_TEMPERATURE_MULTIPLIER = 0.65; // more than 65% of the water temperature at the heater must be on the valve to open it.
+constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.85; // less than 85% of the maximum water temperature at the valve must be on the valve to close it.
 
 constexpr double PRESSURE_SENSOR_MIN_BAR = 0.0;
 constexpr double PRESSURE_SENSOR_MAX_BAR = 10.0;

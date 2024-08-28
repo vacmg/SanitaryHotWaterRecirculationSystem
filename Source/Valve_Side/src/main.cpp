@@ -92,6 +92,7 @@ unsigned long timeBeforeGettingHeaterTempMillis = 0;
 
 int progressMinTemp = 0;
 float desiredTemp = 0;
+float maxTemp = 0;
 
 unsigned long valveTempRequestTempMillis = 0;
 bool valveTempRequested = false;
@@ -915,15 +916,15 @@ bool getHeaterTempIfNecessary(int* temp)
     return false;
 }
 
-float getDesiredTemp(const int heaterTemp)
+float getDesiredTemp(const float temp)
 {
     if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_Idle)
     {
-        return roundf(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY*COLD_WATER_TEMPERATURE_MULTIPLIER);
+        return roundf(temp*COLD_WATER_TEMPERATURE_MULTIPLIER);
     }
     else
     {
-        return roundf(heaterTemp*PIPE_HEAT_TRANSPORT_EFFICIENCY);
+        return roundf(temp*HOT_WATER_TEMPERATURE_MULTIPLIER);
     }
 }
 
@@ -1166,7 +1167,7 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, desiredTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
+                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, static_cast<long>(desiredTemp), MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
                     debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     writeColor(progress, 0, 255-progress);
@@ -1178,7 +1179,8 @@ void stepFSM()
 
                         changeStatus(OnPressureTrigger_ServingWater);
 
-                        desiredTemp = getDesiredTemp(getHeaterTemp());
+                        desiredTemp = MIN_ALLOWED_TEMP;
+                        maxTemp = MIN_ALLOWED_TEMP;
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
                 }
@@ -1190,8 +1192,17 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    long progress = map(static_cast<long>(valveTemp), desiredTemp, progressMinTemp, 0, 100);
+
+                    if(valveTemp > maxTemp)
+                    {
+                        debug(statusToString(currentStatus));debug(F("\tmaxTemp updated from ")); debug(maxTemp); debug(F(" to ")); debugln(valveTemp);
+                        maxTemp = valveTemp;
+                        desiredTemp = getDesiredTemp(valveTemp);
+                    }
+
+                    long progress = map(static_cast<long>(valveTemp), static_cast<long>(desiredTemp), progressMinTemp, 0, 100);
                     debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
+
                     if(!isTriggerActive() && valveTemp < desiredTemp)
                     {
                         setValve(false);
@@ -1244,7 +1255,8 @@ void stepFSM()
 
                         changeStatus(AlwaysActive_Idle);
 
-                        desiredTemp = getDesiredTemp(getHeaterTemp());
+                        desiredTemp = MIN_ALLOWED_TEMP;
+                        maxTemp = MIN_ALLOWED_TEMP;
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
                 }
@@ -1255,8 +1267,17 @@ void stepFSM()
             if(tempRequestReady)
             {
                 tempRequestReady = false;
+
+                if(valveTemp > maxTemp)
+                {
+                    debug(statusToString(currentStatus));debug(F("\tmaxTemp updated from ")); debug(maxTemp); debug(F(" to ")); debugln(valveTemp);
+                    maxTemp = valveTemp;
+                    desiredTemp = getDesiredTemp(valveTemp);
+                }
+
                 long progress = map(static_cast<long>(valveTemp), static_cast<long>(desiredTemp), progressMinTemp, 0, 100);
                 debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
+
                 if(!isTriggerActive() && valveTemp < desiredTemp)
                 {
                     changeStatus(AlwaysActive_TransitionToGettingHotWater);
