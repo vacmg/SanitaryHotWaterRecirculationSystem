@@ -49,7 +49,7 @@ typedef struct
 #define LED_ENABLED 0
 #define LED_DISABLED !LED_ENABLED
 
-#define BTN_PRESSED 1
+#define BTN_PRESSED 0
 #define BTN_RELEASED !BTN_PRESSED
 
 #define SC_MAX_MESSAGE_SIZE 127 // Real message size is SC_MAX_MESSAGE_SIZE+1, but the last byte is reserved for the null terminator.
@@ -65,14 +65,14 @@ constexpr float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
 constexpr int WATCHDOG_RESET_PERIOD = 4000; // 4 s
 constexpr long SYSTEM_RESET_PERIOD = 86400000; // 24 h
-constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 10000; // 10 s
+constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 15000; // 15 s
 
 constexpr int MIN_PROGRESS_VALUE = 0; // [0-255]
 constexpr int MAX_PROGRESS_VALUE = 220; // [0-255]
 constexpr int FADE_MIN_TEMP_OFFSET = 2;
 
-constexpr int FALLBACK_MODE_ANIMATION_FRAME_DELAY = 2; // ms
-constexpr int ALWAYS_ACTIVE_MODE_ANIMATION_FRAME_DELAY = 2; // ms
+constexpr int FALLBACK_MODE_ANIMATION_FRAME_DELAY = 20; // ms
+constexpr int ALWAYS_ACTIVE_MODE_ANIMATION_FRAME_DELAY = 20; // ms
 constexpr float FALLBACK_MODE_ANIMATION_BRIGHTNESS_STEP = 0.01; // [0-1]
 constexpr float ALWAYS_ACTIVE_MODE_ANIMATION_BRIGHTNESS_STEP = 0.01; // [0-1]
 
@@ -86,7 +86,7 @@ constexpr int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // ms
 
 constexpr int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 constexpr int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
-constexpr float HOT_WATER_TEMPERATURE_MULTIPLIER = 0.65; // more than 65% of the water temperature at the heater must be on the valve to open it.
+constexpr float HOT_WATER_TEMPERATURE_MULTIPLIER = 0.72; // more than 72% of the water temperature at the heater must be on the valve to open it.
 constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.85; // less than 85% of the maximum water temperature at the valve must be on the valve to close it.
 
 constexpr double PRESSURE_SENSOR_MIN_BAR = 0.0;

@@ -920,11 +920,11 @@ float getDesiredTemp(const float temp)
 {
     if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_Idle)
     {
-        return roundf(temp*COLD_WATER_TEMPERATURE_MULTIPLIER);
+        return temp*COLD_WATER_TEMPERATURE_MULTIPLIER;
     }
     else
     {
-        return roundf(temp*HOT_WATER_TEMPERATURE_MULTIPLIER);
+        return temp*HOT_WATER_TEMPERATURE_MULTIPLIER;
     }
 }
 
@@ -1200,8 +1200,7 @@ void stepFSM()
                         desiredTemp = getDesiredTemp(valveTemp);
                     }
 
-                    long progress = map(static_cast<long>(valveTemp), static_cast<long>(desiredTemp), progressMinTemp, 0, 100);
-                    debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
+                    debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
 
                     if(!isTriggerActive() && valveTemp < desiredTemp)
                     {
@@ -1241,6 +1240,7 @@ void stepFSM()
                 desiredTemp = getDesiredTemp(lastHeaterTemp);
 
                 fadeAnimationStep(getRGBColor(ALWAYS_ACTIVE_WATER_COLOR), ALWAYS_ACTIVE_MODE_ANIMATION_BRIGHTNESS_STEP);
+                delay(ALWAYS_ACTIVE_MODE_ANIMATION_FRAME_DELAY);
 
                 if(tempRequestReady)
                 {
@@ -1275,8 +1275,7 @@ void stepFSM()
                     desiredTemp = getDesiredTemp(valveTemp);
                 }
 
-                long progress = map(static_cast<long>(valveTemp), static_cast<long>(desiredTemp), progressMinTemp, 0, 100);
-                debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug(progress); debugln(F("%"));
+                debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
 
                 if(!isTriggerActive() && valveTemp < desiredTemp)
                 {
