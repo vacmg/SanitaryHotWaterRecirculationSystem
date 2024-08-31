@@ -68,7 +68,7 @@ constexpr long SYSTEM_RESET_PERIOD = 86400000; // 24 h
 constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 15000; // 15 s
 
 constexpr int MIN_PROGRESS_VALUE = 0; // [0-255]
-constexpr int MAX_PROGRESS_VALUE = 220; // [0-255]
+constexpr int MAX_PROGRESS_VALUE = 200; // [0-255]
 constexpr int FADE_MIN_TEMP_OFFSET = 2;
 
 constexpr int FALLBACK_MODE_ANIMATION_FRAME_DELAY = 20; // ms
