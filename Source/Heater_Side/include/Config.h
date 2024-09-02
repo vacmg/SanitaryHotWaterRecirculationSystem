@@ -21,6 +21,7 @@
 #define DEBUGTEMP 0
 #define DEBUGCONNECT 0
 #define PROFILER_ENABLED 1
+#define ENABLE_HEARTBEAT 1
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU.
 #define MOCK_SENSORS 0
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
@@ -132,7 +133,7 @@ constexpr char setPumpTimeoutCMD[] = "SPT";
     }
 }
 
-inline const char* getErrorName(ErrorCode error)
+const char* getErrorName(ErrorCode error)
 {
     switch(error)
     {
@@ -175,7 +176,7 @@ inline void profilerStartMeasure()
     profilerMillis = millis();
 }
 
-inline int profilerEndMeasure()
+int profilerEndMeasure()
 {
     profilerMillis = millis() - profilerMillis;
     int updated = 0;
@@ -212,7 +213,7 @@ inline void loadProfilerData()
     }
 }
 
-inline void printProfilerData()
+void printProfilerData()
 {
     Serial.println("Profiler Data:");
     Serial.print("Min Time: ");
@@ -225,6 +226,7 @@ inline void printProfilerData()
     Serial.println(profilerData.maxTimeData);
     Serial.println();
 }
+
 #else
 
 inline void loadProfilerData()
@@ -237,6 +239,7 @@ inline void printProfilerData()
 {
     Serial.println("Profiler is disabled.");
 }
+
 #endif
 
 #endif

@@ -26,6 +26,10 @@ constexpr uint8_t BLUE_LED_PIN = 10;
 
 constexpr uint8_t BUTTON_PIN = 8;
 
+#if ENABLE_HEARTBEAT
+constexpr uint8_t HEARTBEAT_PIN = 13;
+#endif
+
 #if !MOCK_SENSORS
 constexpr uint8_t PRESSURE_SENSOR = A0;
 constexpr uint8_t TEMP_SENSOR = 12;
@@ -386,7 +390,13 @@ void resetWatchdogsIfNecessary()
 {
     if(millis() - watchdogsPMillis > WATCHDOG_RESET_PERIOD) // Reset both watchdogs once in a WATCHDOG_RESET_PERIOD
     {
+    #if ENABLE_HEARTBEAT
+        digitalWrite(HEARTBEAT_PIN, 1);
+    #endif
         resetWatchdogs();
+    #if ENABLE_HEARTBEAT
+        digitalWrite(HEARTBEAT_PIN, 0);
+    #endif
     }
 }
 
@@ -1370,6 +1380,11 @@ void setup()
     pinMode(GREEN_LED_PIN, OUTPUT);
     pinMode(BLUE_LED_PIN, OUTPUT);
 
+    #if ENABLE_HEARTBEAT
+        pinMode(HEARTBEAT_PIN, OUTPUT);
+        digitalWrite(HEARTBEAT_PIN, 1);
+    #endif
+
     pinMode(BUTTON_PIN, INPUT_PULLUP);
 
     writeColor(WDT_BOOT_DELAY_COLOR);
@@ -1399,7 +1414,7 @@ void setup()
         Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR RS485 COMMUNICATION OVER SERIAL1"));
         rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT, SERIAL_7N1); // The first argument is serial baud rate & the second one is the serial input timeout (to enable the find function), third argument is hardware serial options.
     #else
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // first argument is serial baud rate & the second one is the serial input timeout (to enable the find function)
+        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // the first argument is serial baud rate & the second one is the serial input timeout (to enable the find function)
     #endif
 
     Serial.print(F("\nINFO: RS485 COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
@@ -1471,6 +1486,10 @@ void setup()
     delay(1000);
 
     resetWatchdogs();
+
+    #if ENABLE_HEARTBEAT
+        digitalWrite(HEARTBEAT_PIN, 0);
+    #endif
 
     writeColor(statusToColor(currentStatus));
 

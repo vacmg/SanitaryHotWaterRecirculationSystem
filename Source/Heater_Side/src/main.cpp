@@ -13,6 +13,10 @@ constexpr uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
 constexpr uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
 constexpr uint8_t pumpRelayPin = 7; // Pump relay pin
 
+#if ENABLE_HEARTBEAT
+constexpr uint8_t HEARTBEAT_PIN = 13;
+#endif
+
 #if !MOCK_SENSORS
 constexpr uint8_t TEMP_SENSOR = 12;
 
@@ -179,7 +183,15 @@ void handleCommsEvent()
                 debugln(F("Sending OK CMD"));
                 #endif
 
+                #if ENABLE_HEARTBEAT
+                    digitalWrite(HEARTBEAT_PIN, 1);
+                #endif
+
                 comms.sendCommand(OKCMD, nullptr, 0);
+
+                #if ENABLE_HEARTBEAT
+                    digitalWrite(HEARTBEAT_PIN, 0);
+                #endif
 
                 #if DEBUGWATCHDOG
                 debugln(F("Watchdog reset command processed"));
@@ -286,6 +298,11 @@ void setup()
         wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds.*/
     #endif
 
+    #if ENABLE_HEARTBEAT
+        pinMode(HEARTBEAT_PIN, OUTPUT);
+        digitalWrite(HEARTBEAT_PIN, 1);
+    #endif
+
     pinMode(pumpRelayPin,OUTPUT);
     digitalWrite(pumpRelayPin,RELAY_DISABLED);
     Serial.begin(SERIAL_USB_BAUD_RATE); // Used for debug purposes
@@ -322,6 +339,10 @@ void setup()
 
     loadProfilerData();
     printProfilerData();
+
+    #if ENABLE_HEARTBEAT
+        digitalWrite(HEARTBEAT_PIN, 0);
+    #endif
 }
 
 void loop()
