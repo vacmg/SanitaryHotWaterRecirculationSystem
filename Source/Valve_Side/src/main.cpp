@@ -93,6 +93,7 @@ bool triggerVal = false;
 unsigned long heaterTempPMillis = 0;
 unsigned long valveTempPMillis = 0;
 unsigned long timeBeforeGettingHeaterTempMillis = 0;
+unsigned long flashDrivingWaterColorMillis = 0;
 
 int progressMinTemp = 0;
 float desiredTemp = 0;
@@ -1153,18 +1154,28 @@ void stepFSM()
 
                 changeStatus(OnPressureTrigger_TransitionToDrivingWater);
                 timeBeforeGettingHeaterTempMillis = millis();
+                flashDrivingWaterColorMillis = timeBeforeGettingHeaterTempMillis;
                 debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
                 progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
             }
             break;
 
         case OnPressureTrigger_TransitionToDrivingWater:
-            if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
             {
-                heaterTempPMillis = 0;
-                valveTempPMillis = 0;
+                if(millis() - flashDrivingWaterColorMillis > FLASH_DRIVING_WATER_COLOR_PERIOD)
+                {
+                    static bool flash = false;
+                    writeColor(flash?DRIVING_WATER_COLOR:Black);
+                    flash = (!flash);
+                    flashDrivingWaterColorMillis = millis();
+                }
+                if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
+                {
+                    heaterTempPMillis = 0;
+                    valveTempPMillis = 0;
 
-                changeStatus(OnPressureTrigger_DrivingWater);
+                    changeStatus(OnPressureTrigger_DrivingWater);
+                }
             }
             break;
 

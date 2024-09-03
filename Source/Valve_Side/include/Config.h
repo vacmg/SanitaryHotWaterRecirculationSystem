@@ -85,6 +85,8 @@ constexpr int BUTTON_SHORT_PRESSED_MIN_TIME = 100; // ms
 
 constexpr int TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME = 100; // ms
 
+constexpr int FLASH_DRIVING_WATER_COLOR_PERIOD = 1000; // 1 s
+
 constexpr int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 constexpr int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
 constexpr float HOT_WATER_TEMPERATURE_MULTIPLIER = 0.72; // more than 72% of the water temperature at the heater must be on the valve to open it.
