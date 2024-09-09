@@ -66,7 +66,7 @@ constexpr float MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA = 21; // mA
 
 constexpr int WATCHDOG_RESET_PERIOD = 4000; // 4 s
 constexpr long SYSTEM_RESET_PERIOD = 86400000; // 24 h
-constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 15000; // 15 s
+constexpr int TIME_BEFORE_GETTING_HEATER_TEMP = 22000; // 22 s
 
 constexpr int MIN_PROGRESS_VALUE = 0; // [0-255]
 constexpr int MAX_PROGRESS_VALUE = 200; // [0-255]

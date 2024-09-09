@@ -95,6 +95,9 @@ unsigned long valveTempPMillis = 0;
 unsigned long timeBeforeGettingHeaterTempMillis = 0;
 unsigned long flashDrivingWaterColorMillis = 0;
 
+bool hotStart = false; // This is used to know if enough time has passed since the last time the pump was started.
+int lastHeaterTemp;
+
 int progressMinTemp = 0;
 float desiredTemp = 0;
 float maxTemp = 0;
@@ -927,16 +930,14 @@ bool getHeaterTempIfNecessary(int* temp)
     return false;
 }
 
-float getDesiredTemp(const float temp)
+float getDesiredTemp(const float temp, Status status = currentStatus)
 {
-    if(currentStatus == OnPressureTrigger_ServingWater || currentStatus == AlwaysActive_Idle)
-    {
-        return temp*COLD_WATER_TEMPERATURE_MULTIPLIER;
-    }
-    else
+    if( (status == OnPressureTrigger_DrivingWater || status == AlwaysActive_GettingHotWater) && !hotStart)
     {
         return temp*HOT_WATER_TEMPERATURE_MULTIPLIER;
     }
+
+    return temp*COLD_WATER_TEMPERATURE_MULTIPLIER;
 }
 
 void printSystemInfo()
@@ -1144,6 +1145,7 @@ void stepFSM()
             setPump(false);
             setPumpTimeout(AUTO_DISABLE_PUMP_TIMEOUT);
             setValve(false);
+            hotStart = false;
             changeStatus(OnPressureTrigger_WaitingCold);
             break;
 
@@ -1153,6 +1155,7 @@ void stepFSM()
                 setPump(true);
 
                 changeStatus(OnPressureTrigger_TransitionToDrivingWater);
+                hotStart = false;
                 timeBeforeGettingHeaterTempMillis = millis();
                 flashDrivingWaterColorMillis = timeBeforeGettingHeaterTempMillis;
                 debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
@@ -1175,13 +1178,21 @@ void stepFSM()
                     valveTempPMillis = 0;
 
                     changeStatus(OnPressureTrigger_DrivingWater);
+
+                    getHeaterTempIfNecessary(&lastHeaterTemp);
+                    if(lastHeaterTemp > getDesiredTemp(lastHeaterTemp))
+                    {
+                        hotStart = true;
+                    }
+
+                    heaterTempPMillis = 0;
+                    valveTempPMillis = 0;
                 }
             }
             break;
 
         case OnPressureTrigger_DrivingWater:
             {
-                static int lastHeaterTemp;
                 getHeaterTempIfNecessary(&lastHeaterTemp);
                 desiredTemp = getDesiredTemp(lastHeaterTemp);
 
@@ -1251,12 +1262,20 @@ void stepFSM()
 
                 heaterTempPMillis = 0;
                 valveTempPMillis = 0;
+
+                getHeaterTempIfNecessary(&lastHeaterTemp);
+                if(lastHeaterTemp > getDesiredTemp(lastHeaterTemp))
+                {
+                    hotStart = true;
+                }
+
+                heaterTempPMillis = 0;
+                valveTempPMillis = 0;
             }
             break;
 
         case AlwaysActive_GettingHotWater:
             {
-                static int lastHeaterTemp;
                 getHeaterTempIfNecessary(&lastHeaterTemp);
                 desiredTemp = getDesiredTemp(lastHeaterTemp);
 
@@ -1301,6 +1320,7 @@ void stepFSM()
                 if(!isTriggerActive() && valveTemp < desiredTemp)
                 {
                     changeStatus(AlwaysActive_TransitionToGettingHotWater);
+                    hotStart = false;
                     timeBeforeGettingHeaterTempMillis = millis();
                     debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
                     progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
