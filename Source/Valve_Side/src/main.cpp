@@ -745,12 +745,12 @@ void getValveTempIfNecessary(bool ignoreErrors = false)
         char errorBuff[ERROR_MESSAGE_SIZE];
         if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
         {
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
             raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
         }
         if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
         {
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
+            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
             raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
         }
         valveTempRequested = false;
@@ -821,7 +821,9 @@ int getHeaterTemp(bool ignoreErrors = false)
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
     {
+        #if DEBUGTEMP
         debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+        #endif
         comms.sendCommand(tempCMD, nullptr, 0);
         delay(TEMP_MESSAGE_PROCESSING_WAIT_TIME);
         int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
@@ -833,8 +835,10 @@ int getHeaterTemp(bool ignoreErrors = false)
                 {
                     if(!ignoreErrors)
                     {
+                        #if DEBUGTEMP
                         debug(F("Heater temp received: "));
                         debugln(commsBuffer);
+                        #endif
                     }
                     const long temp = strtol(commsBuffer, nullptr, 10);
                     if(!ignoreErrors && static_cast<float>(temp) < MIN_ALLOWED_TEMP)
@@ -951,6 +955,7 @@ void printSystemInfo()
     Serial.print(F(    "Comms message max length: ")); Serial.println(SC_MAX_MESSAGE_SIZE);
     Serial.print(F(    "Mode: ")); Serial.println(modeToString(currentMode));
     Serial.print(F(    "Status: ")); Serial.println(statusToString(currentStatus));
+    Serial.print(F(    "Hot Start: ")); Serial.println(hotStart?F("ACTIVE"):F("INACTIVE"));
 }
 
 void printSensorsInfo()
@@ -1180,8 +1185,9 @@ void stepFSM()
                     changeStatus(OnPressureTrigger_DrivingWater);
 
                     getHeaterTempIfNecessary(&lastHeaterTemp);
-                    if(lastHeaterTemp > getDesiredTemp(lastHeaterTemp))
+                    if(valveTemp > getDesiredTemp(lastHeaterTemp))
                     {
+                        debug(statusToString(currentStatus));debugln(F("\tHot start detected"));
                         hotStart = true;
                     }
 
@@ -1264,8 +1270,9 @@ void stepFSM()
                 valveTempPMillis = 0;
 
                 getHeaterTempIfNecessary(&lastHeaterTemp);
-                if(lastHeaterTemp > getDesiredTemp(lastHeaterTemp))
+                if(valveTemp > getDesiredTemp(lastHeaterTemp))
                 {
+                    debug(statusToString(currentStatus));debugln(F("\tHot start detected"));
                     hotStart = true;
                 }
 
