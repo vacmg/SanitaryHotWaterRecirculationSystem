@@ -69,6 +69,8 @@ typedef struct
 #define SERVING_WATER_COLOR Red
 #define ALWAYS_ACTIVE_WATER_COLOR Orange
 #define WDT_BOOT_DELAY_COLOR Cyan
+#define EMERGENCY_SHUTDOWN_1_COLOR White
+#define EMERGENCY_SHUTDOWN_2_COLOR Yellow
 
 typedef enum {NO_PULSE = 0, SHORT_PULSE, LONG_PULSE} ButtonStatus;
 
@@ -91,7 +93,6 @@ bool triggerVal = false;
 #endif
 
 unsigned long heaterTempPMillis = 0;
-unsigned long valveTempPMillis = 0;
 unsigned long timeBeforeGettingHeaterTempMillis = 0;
 unsigned long flashDrivingWaterColorMillis = 0;
 
@@ -406,7 +407,7 @@ void resetWatchdogsIfNecessary()
 
 #endif
 
-ButtonStatus readButton()
+ButtonStatus readButton(bool avoidWatchdogReset = false)
 {
     ButtonStatus res = NO_PULSE;
 
@@ -421,7 +422,10 @@ ButtonStatus readButton()
         while(digitalRead(BUTTON_PIN) == BTN_PRESSED && millis() - time < BUTTON_LONG_PRESSED_TIME)
         {
             #if !DISABLE_WATCHDOGS
-            resetWatchdogsIfNecessary();
+            if(!avoidWatchdogReset)
+            {
+                resetWatchdogsIfNecessary();
+            }
             #endif
         }
 
@@ -1180,7 +1184,6 @@ void stepFSM()
                 if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
                 {
                     heaterTempPMillis = 0;
-                    valveTempPMillis = 0;
 
                     changeStatus(OnPressureTrigger_DrivingWater);
 
@@ -1192,7 +1195,6 @@ void stepFSM()
                     }
 
                     heaterTempPMillis = 0;
-                    valveTempPMillis = 0;
                 }
             }
             break;
@@ -1267,7 +1269,6 @@ void stepFSM()
                 changeStatus(AlwaysActive_GettingHotWater);
 
                 heaterTempPMillis = 0;
-                valveTempPMillis = 0;
 
                 getHeaterTempIfNecessary(&lastHeaterTemp);
                 if(valveTemp > getDesiredTemp(lastHeaterTemp))
@@ -1277,7 +1278,6 @@ void stepFSM()
                 }
 
                 heaterTempPMillis = 0;
-                valveTempPMillis = 0;
             }
             break;
 
@@ -1352,7 +1352,7 @@ void connectToHeater(bool ignoreErrors = false)
         delay(20);
 
         #if DEBUGCONNECT
-        debugln(F("Sending Watchdog Reset CMD: "));
+        debugln(F("Sending Watchdog Reset CMD"));
         #endif
 
         comms.sendCommand(WTDRSTCMD, nullptr, 0);
@@ -1361,6 +1361,9 @@ void connectToHeater(bool ignoreErrors = false)
 
         if(comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE) > 0)
         {
+            #if DEBUGCONNECT
+            debugln(F("Received WTD-RST response"));
+            #endif
             if(strcmp(commsBuffer, OKCMD) == 0)
             {
                 connected = true;
@@ -1432,10 +1435,69 @@ void setup()
     wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds*/
     #endif
 
-    writeColor(BOOT_COLOR);
-
     Serial.begin(SERIAL_USB_BAUD_RATE); // Used for debug
     delay(3000);
+    writeColor(White);
+
+    unsigned long startMillis = millis();
+    while(millis() - startMillis < 3000)
+    {
+        if(readButton(true) == LONG_PULSE)
+        {
+            wdt_disable();
+            debugln(F("Long pulse detected, entering emergency shutdown mode"));
+            writeColor(Black);
+
+            bool valveSt = false;
+            setValve(valveSt);
+
+            byte colorSt = 0;
+            unsigned long colorMillis = millis();
+
+            while (readButton(true) != NO_PULSE);
+
+            while (true)
+            {
+                if(millis() - colorMillis > FLASH_EMERGENCY_SHUTDOWN_COLOR_PERIOD)
+                {
+                    colorMillis = millis();
+                    switch (colorSt)
+                    {
+                        case 0:
+                            writeColor(EMERGENCY_SHUTDOWN_1_COLOR);
+                            break;
+                        case 1:
+                            writeColor(Black);
+                            break;
+                        case 2:
+                            writeColor(EMERGENCY_SHUTDOWN_2_COLOR);
+                            break;
+                        case 3:
+                            writeColor(Black);
+                            break;
+                        default:
+                            break;
+                    }
+                    colorSt = (colorSt + 1) % 4;
+                }
+
+                switch (readButton(true))
+                {
+                    case SHORT_PULSE:
+                        valveSt = !valveSt;
+                        setValve(valveSt);
+                        break;
+                    case LONG_PULSE:
+                        raiseError(NO_ERROR, F("Rebooting by user command (button long press)"));
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
+    writeColor(BOOT_COLOR);
+
     Serial.println(F("\n------------------------------------------"  ));
     Serial.println(F(  "|                SHWRS-VS                |"  ));
     Serial.println(F(  "|                 " VS "                 |"  ));
