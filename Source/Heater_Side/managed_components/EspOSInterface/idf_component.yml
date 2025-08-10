@@ -1,0 +1,12 @@
+version: "1.0.0"
+description: "This is the ESP-IDF implementation of the vacmg/OSInterface component"
+url: "https://github.com/vacmg/EspOSInterface"
+files:
+    exclude:
+        - ".github/*"
+        - "test-project/*"
+        - "test/*"
+        - ".clang-*"
+dependencies:
+    idf:
+        version: ">=5.4.0"

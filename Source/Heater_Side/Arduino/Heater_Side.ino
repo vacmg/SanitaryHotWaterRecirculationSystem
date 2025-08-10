@@ -2,7 +2,7 @@
  * This is the source code of the part of the system which is near to the heater source.
  */
 
-#include "Config.h"
+#include "../Config.h"
 #include<avr/wdt.h> /* Header for watchdog timers in AVR */
 #include <MAX_RS485.h>
 

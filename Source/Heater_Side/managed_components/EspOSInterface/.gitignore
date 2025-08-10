@@ -1,0 +1,6 @@
+.idea
+*build*
+sdkconfig.old
+test.log
+sdkconfig
+__pycache__

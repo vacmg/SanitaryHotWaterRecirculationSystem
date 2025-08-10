@@ -1,0 +1,11 @@
+dependencies:
+    EspOSInterface:
+        git: git@github.com:purifymywater/EspOSInterface.git
+        version: "v1.1.1"
+
+    EspISOTPLib:
+        git: git@github.com:PurifyMyWater/EspISOTPLib.git
+        version: "v0.0.3"
+
+    idf:
+        version: ">=5.4.0"
