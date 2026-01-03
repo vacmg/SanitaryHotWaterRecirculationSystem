@@ -5,7 +5,7 @@
 #ifndef HEATER_SIDE_SIMPLECOMMS_H
 #define HEATER_SIDE_SIMPLECOMMS_H
 
-#include <StreamUtils.h> // github.com/bblanchon/ArduinoStreamUtils
+#include "StreamUtils.h" // github.com/bblanchon/ArduinoStreamUtils
 #include <Stream.h>
 
 #ifndef SC_MAX_MESSAGE_SIZE
