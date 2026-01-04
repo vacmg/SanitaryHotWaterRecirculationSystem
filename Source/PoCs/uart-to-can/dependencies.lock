@@ -1,4 +1,27 @@
 dependencies:
+  EspCANDriver:
+    component_hash: d20fae455651d727d6ec81cc4ea9b769c34476b3afdd10cba0766d9f9053663b
+    dependencies:
+    - name: idf
+      version: '>=5.5.0'
+    - git: git@github.com:vacmg/EspOSInterface.git
+      name: EspOSInterface
+      version: v0.3.1
+    source:
+      git: git@github.com:PurifyMyWater/EspCANDriver.git
+      path: .
+      type: git
+    version: 6b30600059b0445626e7d1bca88328577317af9d
+  EspOSInterface:
+    component_hash: b781e3c1c8bf6fc624150e04c22805cee5ba6ab8652eabe0d35cc48ba99da41b
+    dependencies:
+    - name: idf
+      version: '>=5.4.0'
+    source:
+      git: git@github.com:vacmg/EspOSInterface.git
+      path: .
+      type: git
+    version: 21299cdfd23ad84444819a09af77ec3cddf9732e
   chmorgan/esp-libhelix-mp3:
     component_hash: cbb76089dc2c5749f7b470e2e70aedc44c9da519e04eb9a67d4c7ec275229e53
     dependencies:
@@ -10,7 +33,7 @@ dependencies:
       type: service
     version: 1.0.3
   espressif/arduino-esp32:
-    component_hash: b08668a01eaf1ecd61340a59bf965f03dd966c18b1aa7c8ae98d74cfe2a40258
+    component_hash: dcff5d6fbbe18c30bfe76cd200dc2b1254c98a7116a6835b600ae9076ff8761c
     dependencies:
     - name: chmorgan/esp-libhelix-mp3
       registry_url: https://components.espressif.com
@@ -21,12 +44,12 @@ dependencies:
       require: private
       rules:
       - if: target not in [esp32c2, esp32p4]
-      version: 0.6.0~1
+      version: 0.6.1~4
     - name: espressif/esp-dsp
       registry_url: https://components.espressif.com
       require: private
       rules:
-      - if: target != esp32c2
+      - if: target not in [esp32c2, esp32c61]
       version: ^1.3.4
     - name: espressif/esp-modbus
       registry_url: https://components.espressif.com
@@ -42,14 +65,14 @@ dependencies:
       registry_url: https://components.espressif.com
       require: private
       rules:
-      - if: target not in [esp32c2, esp32p4]
+      - if: target not in [esp32c2, esp32c61, esp32p4]
       version: ==1.6.4
     - name: espressif/esp-zigbee-lib
       registry_url: https://components.espressif.com
       require: private
       rules:
-      - if: target not in [esp32c2, esp32p4]
-      version: ==1.6.7
+      - if: target not in [esp32c2, esp32c61, esp32p4]
+      version: ==1.6.8
     - name: espressif/esp_diag_data_store
       registry_url: https://components.espressif.com
       require: private
@@ -67,7 +90,7 @@ dependencies:
       require: private
       rules:
       - if: target == esp32p4
-      version: ^2.0.12
+      version: ^2.8.0
     - name: espressif/esp_insights
       registry_url: https://components.espressif.com
       require: private
@@ -77,7 +100,7 @@ dependencies:
     - name: espressif/esp_modem
       registry_url: https://components.espressif.com
       require: private
-      version: ^1.1.0
+      version: ^2.0.0
     - name: espressif/esp_rainmaker
       registry_url: https://components.espressif.com
       require: private
@@ -89,7 +112,7 @@ dependencies:
       require: private
       rules:
       - if: target == esp32p4
-      version: ^0.13.0
+      version: ^1.2.2
     - name: espressif/lan867x
       registry_url: https://components.espressif.com
       require: private
@@ -138,21 +161,22 @@ dependencies:
     - esp32c3
     - esp32c5
     - esp32c6
+    - esp32c61
     - esp32h2
     - esp32p4
     - esp32s2
     - esp32s3
-    version: 3.3.3
+    version: 3.3.5
   espressif/cbor:
-    component_hash: 440f4ee4504841cc9b4f3a8ef755776a612ac9dace355514c68b999868f990ff
+    component_hash: dad9ca860963e930366510a10b422b3125a4fb27b979712ed65efcbcd742de50
     dependencies:
     - name: idf
       require: private
-      version: '>=4.3'
+      version: '>=5.0'
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 0.6.0~1
+    version: 0.6.1~4
   espressif/esp-dsp:
     component_hash: 42dce32d46ac93dc11f60d368e29a830e9661c7345d794b8a45c343479cae636
     dependencies:
@@ -191,7 +215,7 @@ dependencies:
       type: service
     version: 1.6.4
   espressif/esp-zigbee-lib:
-    component_hash: 4b73d7dc7d018114f24712a5af1bb7a53dca95f979fe646461f066f344dd9120
+    component_hash: fa0812e6743e2a7d999af9f44ccdcea17ccb1e80f98d6b2956f44687503a88fd
     dependencies:
     - name: idf
       require: private
@@ -199,7 +223,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 1.6.7
+    version: 1.6.8
   espressif/esp_diag_data_store:
     component_hash: c1e5cf62f545d2b136db299f4df1b228b9840be5bc3410c9ad2d2a882b5c0d64
     dependencies:
@@ -253,7 +277,7 @@ dependencies:
       type: service
     version: 1.2.2
   espressif/esp_modem:
-    component_hash: 40af7f39c6c8c0c85c98014721fca8d9d2186f18f70645c66b94548192cf1e03
+    component_hash: 07b6ca85dc0c1edbcd76f650005c74067001db138db6bfa106bf05567adca4af
     dependencies:
     - name: idf
       require: private
@@ -261,7 +285,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com
       type: service
-    version: 1.4.2
+    version: 2.0.0
   espressif/esp_rainmaker:
     component_hash: f6fe458fc7a0102ee2879f0247da4b41419e6c07de12031f66e5e9454d25baaa
     dependencies:
@@ -460,8 +484,9 @@ dependencies:
       type: service
     version: 1.20.3
 direct_dependencies:
+- EspCANDriver
 - espressif/arduino-esp32
 - idf
-manifest_hash: 1170dd4d698f8f5b27fa819dcda609cf029626cbc9fb65e97d551e6ce2a275af
+manifest_hash: 8aab7bc61bcb667b466b667eb33f0f71d369a34a711edc1768b3d9bc4e14da88
 target: esp32
 version: 2.0.0
