@@ -2,7 +2,6 @@
 
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
 
-#include "SimpleComms.h"
 #include "EspCANDriver.h"
 
 EspCANDriver*  driver = nullptr;
@@ -11,34 +10,35 @@ EspOSInterface osInterface;
 [[noreturn]] void onSerialEvent(void* pvParameters)
 {
     OSInterfaceLogInfo("onSerialEvent", "Starting task...");
-    SimpleComms* comms = static_cast<SimpleComms*>(pvParameters);
+    auto* comms = static_cast<Stream*>(pvParameters);
+    CANFrame frame = {
+            .id = {.N_AI = 0x1},
+            .ide = true,
+    };
+    uint32_t buffLen = 0;
+
     while (true) {
-        while (comms->available())
-        {
-            char buff[16];
-            auto err = comms->getNextCommand(buff, sizeof(buff));
-            if (err <= 0)
-            {
-                OSInterfaceLogWarning("onSerialEvent", "No command available or error (%d)", err);
-                continue; // No command available or error
-            }
-            CANFrame frame = {
-                    .id = {.N_AI = 0x1},
-                    .dlc = static_cast<uint16_t>(strlen(buff)),
-                    .ide = true,
-            };
-            memcpy(frame.data, buff, std::min(static_cast<size_t>(frame.dlc), sizeof(frame.data)));
-            driver->sendFrame(frame, portMAX_DELAY);
-            OSInterfaceLogInfo("onSerialEvent", "Sent data \"%s\" (%dB)", buff, err);
+        buffLen = 0;
+        if (!comms->available()) {
+            vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
+            continue;
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
+        while (comms->available() && buffLen < sizeof(frame.data)) // We are not using null-terminated strings, be careful.
+        {
+            int dataByte = comms->read();
+            frame.data[buffLen++] = static_cast<uint8_t>(dataByte);
+            OSInterfaceLogDebug("onSerialEvent", "Read byte: %d (0x%02X) (%c) at position %u", dataByte, dataByte, dataByte, buffLen - 1);
+        }
+        frame.dlc = static_cast<uint8_t>(buffLen);
+        driver->sendFrame(frame, portMAX_DELAY);
+        OSInterfaceLogInfo("onSerialEvent", "Sent data \"%s\"", toString(frame));
     }
 }
 
 [[noreturn]] void onCANEvent(void* pvParameters)
 {
     OSInterfaceLogInfo("onCANEvent", "Starting task...");
-    SimpleComms* comms = static_cast<SimpleComms*>(pvParameters);
+    auto* comms = static_cast<Stream*>(pvParameters);
     while (true)
     {
         OSInterfaceLogDebug("onCANEvent", "Waiting for event from ISR...");
@@ -47,24 +47,21 @@ EspOSInterface osInterface;
         if (std::holds_alternative<CANRXDoneEvent>(event))
         {
             CANRXDoneEvent& rxEvent       = std::get<CANRXDoneEvent>(event);
-            char* commandStr = reinterpret_cast<char*>(rxEvent.frame.data);
-            commandStr[rxEvent.frame.dlc] = '\0'; // Null-terminate the string
-            OSInterfaceLogInfo("onCANEvent", "Forwarding received command over Serial: %s", commandStr);
-            comms->sendCommand(commandStr, nullptr, 0);
-
+            comms->write(rxEvent.frame.data, std::min(rxEvent.frame.dlc, static_cast<uint16_t>(sizeof(rxEvent.frame))));
+            OSInterfaceLogInfo("onCANEvent", "Forwarding received data over Serial: %s", toString(rxEvent));
         }
     }
 }
 
 extern "C" void app_main()
 {
+    OSInterfaceLogInfo("main", "Starting Arduino Core...");
+    initArduino();
+
     OSInterfaceSetLogLevel("main", OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel(EspCANDriver::TAG, OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel("onCANEvent", OSInterface_LOG_INFO);
-    OSInterfaceSetLogLevel("onSerialEvent", OSInterface_LOG_INFO);
-
-    OSInterfaceLogInfo("main", "Starting Arduino Core...");
-    initArduino();
+    OSInterfaceSetLogLevel("onSerialEvent", OSInterface_LOG_DEBUG);
 
     OSInterfaceLogInfo("main", "Starting UART driver...");
     Stream* stream;
@@ -76,7 +73,6 @@ extern "C" void app_main()
     Serial1.begin(9600, SERIAL_8N1, 25, 26);
     stream = &Serial1;
 #endif
-    SimpleComms comms(stream, "SHWRS");
 
     OSInterfaceLogInfo("main", "Starting CAN driver...");
     constexpr twai_onchip_node_config_t node_config = {
@@ -101,9 +97,10 @@ extern "C" void app_main()
 
     OSInterfaceLogInfo("main", "Starting bridge tasks...");
 
-    xTaskCreate(onCANEvent, "onCANEvent", 4096, &comms, 5, nullptr);
-    xTaskCreate(onSerialEvent, "writerTask", 4096, &comms, 5, nullptr);
+    xTaskCreate(onCANEvent, "onCANEvent", 4096, stream, 5, nullptr);
+    xTaskCreate(onSerialEvent, "writerTask", 4096, stream, 5, nullptr);
 
+    OSInterfaceLogInfo("main", "Ready.");
     vTaskSuspend(nullptr);
 
     // WARNING: if program reaches end of function app_main() the MCU will restart.
