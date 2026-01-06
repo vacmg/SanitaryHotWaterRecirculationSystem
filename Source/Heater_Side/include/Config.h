@@ -24,7 +24,7 @@
 #define ENABLE_HEARTBEAT 1
 #define DISABLE_WATCHDOGS 0 // This will also disable the connection check with the other MCU.
 #define MOCK_SENSORS 0
-#define SC_USE_HAMMING_7_4_CORRECTION_CODE 1
+#define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
 #define ENABLE_AUTO_RESTART 1
 #define EEPROM_DONT_WRITE_ERRORS 0 // Only works for errors
 #define EEPROM_ERROR_MEMORY_ITEMS 5

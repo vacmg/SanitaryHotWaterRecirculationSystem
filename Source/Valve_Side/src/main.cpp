@@ -38,8 +38,7 @@ OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
 DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 #endif
 
-MAX_RS485 rs485(&Serial1, RECEIVER_ENABLE_PIN, DRIVE_ENABLE_PIN); // Create rs485 instance
-SimpleComms comms(&rs485, HEADER); // Create comms instance
+SimpleComms comms(&Serial1, HEADER); // Create comms instance
 
 typedef enum {Black, Red, Green, Blue, Yellow, Orange, Purple, Cyan, White, Gray} Color;
 
@@ -1512,9 +1511,11 @@ void setup()
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
         Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR RS485 COMMUNICATION OVER SERIAL1"));
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT, SERIAL_7N1); // The first argument is serial baud rate & the second one is the serial input timeout (to enable the find function), third argument is hardware serial options.
+        Serial1.begin(RS485_SERIAL_BAUD_RATE, SERIAL_7N1);
+        Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #else
-        rs485.begin(RS485_SERIAL_BAUD_RATE, RECEIVED_MESSAGE_TIMEOUT); // the first argument is serial baud rate & the second one is the serial input timeout (to enable the find function)
+        Serial1.begin(RS485_SERIAL_BAUD_RATE);
+        Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #endif
 
     Serial.print(F("\nINFO: RS485 COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
