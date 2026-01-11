@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
+#define SEND_COMPLEX_PAYLOAD_COMMAND 0
 
 #include "SimpleComms.h"
 
@@ -18,6 +19,8 @@ void setup()
     comms = new SimpleComms(&Serial1, "SHWRS");
     delay(1000);
     Serial.println("Starting Serial1 to Serial bridge");
+
+#if SEND_COMPLEX_PAYLOAD_COMMAND
     Serial.println("Press any key to send complex payload command");
     while (!Serial.available());
     delay(500);
@@ -27,6 +30,7 @@ void setup()
     auto res = comms->sendCommand("command", reinterpret_cast<const char**>(args), 3);
     Serial.print("Sent command with result: ");
     Serial.println(res);
+#endif
 }
 
 void loop()
