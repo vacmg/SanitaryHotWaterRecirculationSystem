@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include <algorithm>
 
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
 
@@ -6,6 +7,35 @@
 
 EspCANDriver*  driver = nullptr;
 EspOSInterface osInterface;
+
+static void handleCANNoEvent(Stream* comms, const std::monostate& /*event*/)
+{
+    // Nothing to forward, keep debug log for visibility
+    OSInterfaceLogDebug("onCANEvent", "No CAN event (monostate) received");
+}
+
+static void handleCANRXDoneEvent(Stream* comms, const CANRXDoneEvent& rxEvent)
+{
+    // Forward received bytes to the serial stream (cap to data array size)
+    auto bytesToWrite = std::min<uint16_t>(rxEvent.frame.dlc, static_cast<uint16_t>(sizeof(rxEvent.frame.data)));
+    comms->write(rxEvent.frame.data, bytesToWrite);
+    OSInterfaceLogInfo("onCANEvent", "Forwarding received data over Serial: %s", toString(rxEvent));
+}
+
+static void handleCANTXDoneEvent(Stream* /*comms*/, const CANTXDoneEvent& txEvent)
+{
+    // For TX done we only log the result for now
+    OSInterfaceLogInfo("onCANEvent", "TX completed: %s", toString(txEvent));
+}
+
+static void handleCANStateChangedEvent(Stream* /*comms*/, const CANStateChangedEvent& stateEvent)
+{
+    OSInterfaceLogInfo("onCANEvent", "CAN state changed: %s", toString(stateEvent));
+}
+
+// Helper for std::visit to combine overloads
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 [[noreturn]] void onSerialEvent(void* pvParameters)
 {
@@ -44,12 +74,15 @@ EspOSInterface osInterface;
         OSInterfaceLogDebug("onCANEvent", "Waiting for event from ISR...");
         CANEvent event = driver->getEvent(portMAX_DELAY);
         OSInterfaceLogDebug("onCANEvent", "Received event: %s", toString(event));
-        if (std::holds_alternative<CANRXDoneEvent>(event))
-        {
-            CANRXDoneEvent& rxEvent       = std::get<CANRXDoneEvent>(event);
-            comms->write(rxEvent.frame.data, std::min(rxEvent.frame.dlc, static_cast<uint16_t>(sizeof(rxEvent.frame))));
-            OSInterfaceLogInfo("onCANEvent", "Forwarding received data over Serial: %s", toString(rxEvent));
-        }
+
+        // Dispatch to the correct handler using std::visit and a set of overloads that forward
+        std::visit(overloaded{
+                       [&](const std::monostate& e) { handleCANNoEvent(comms, e); },
+                       [&](const CANRXDoneEvent& e) { handleCANRXDoneEvent(comms, e); },
+                       [&](const CANTXDoneEvent& e) { handleCANTXDoneEvent(comms, e); },
+                       [&](const CANStateChangedEvent& e) { handleCANStateChangedEvent(comms, e); }
+                   },
+                   event);
     }
 }
 
@@ -62,6 +95,7 @@ extern "C" void app_main()
     OSInterfaceSetLogLevel(EspCANDriver::TAG, OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel("onCANEvent", OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel("onSerialEvent", OSInterface_LOG_DEBUG);
+
 
     OSInterfaceLogInfo("main", "Starting UART driver...");
     Stream* stream;
