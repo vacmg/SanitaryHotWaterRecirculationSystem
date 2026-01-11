@@ -326,6 +326,12 @@ void setup()
         Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #endif
 
+    digitalWrite(pumpRelayPin, RELAY_ENABLED);
+    delay(60000);
+    digitalWrite(pumpRelayPin, RELAY_DISABLED);
+    digitalWrite(HEARTBEAT_PIN, 0);
+    while (true);
+
     Serial.print(F("\nINFO: COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
 
     delay(1000);
