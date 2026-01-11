@@ -98,7 +98,7 @@ extern "C" void app_main()
     OSInterfaceLogInfo("main", "Starting bridge tasks...");
 
     xTaskCreate(onCANEvent, "onCANEvent", 4096, stream, 5, nullptr);
-    xTaskCreate(onSerialEvent, "writerTask", 4096, stream, 5, nullptr);
+    xTaskCreate(onSerialEvent, "onSerialEvent", 4096, stream, 5, nullptr);
 
     OSInterfaceLogInfo("main", "Ready.");
     vTaskSuspend(nullptr);
