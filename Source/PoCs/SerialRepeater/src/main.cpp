@@ -2,10 +2,6 @@
 
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
 
-#include "SimpleComms.h"
-
-SimpleComms *comms;
-
 void setup()
 {
     Serial.begin(115200);
@@ -15,7 +11,6 @@ void setup()
 #else
     Serial1.begin(9600, SERIAL_8N1);
 #endif
-    comms = new SimpleComms(&Serial1, "SHWRS");
     delay(1000);
     Serial.println("Starting Serial1 repeater");
 }
