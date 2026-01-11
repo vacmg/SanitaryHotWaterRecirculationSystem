@@ -25,6 +25,9 @@ void loop()
     }
     while (Serial.available())
     {
-        Serial1.write(Serial.read());
+        const auto byte = Serial.read();
+        Serial1.write(byte);
+        Serial.print("Writing ");
+        Serial.println(static_cast<char>(byte));
     }
 }
