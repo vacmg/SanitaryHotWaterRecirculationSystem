@@ -44,6 +44,8 @@ void loop()
     {
         char commandStr[2] = " ";
         commandStr[0] = (char) Serial.read();
+        Serial.print("Sending command: ");
+        Serial.println(commandStr);
         comms->sendCommand(commandStr, nullptr, 0);
     }
 }
