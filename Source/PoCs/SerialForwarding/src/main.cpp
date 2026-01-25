@@ -14,9 +14,9 @@ void setup()
 #if SC_USE_HAMMING_7_4_CORRECTION_CODE
     Serial1.begin(9600, SERIAL_7N1);
 #else
-    Serial2.begin(9600, SERIAL_8N1);
+    Serial1.begin(9600, SERIAL_8N1);
 #endif
-    comms = new SimpleComms(&Serial2, "SHWRS");
+    comms = new SimpleComms(&Serial1, "SHWRS");
     delay(1000);
     Serial.println("Starting Serial1 to Serial bridge");
 
