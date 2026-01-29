@@ -327,7 +327,7 @@ void setup()
     #endif
 
     digitalWrite(pumpRelayPin, RELAY_ENABLED);
-    delay(60000);
+    delay(120000);
     digitalWrite(pumpRelayPin, RELAY_DISABLED);
     digitalWrite(HEARTBEAT_PIN, 0);
     while (true);
