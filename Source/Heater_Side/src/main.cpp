@@ -1,3 +1,10 @@
+// UART LINK: Arduino Mega <-> ESP32
+//  +--------------------+      UART      +------------------+
+//  |   Arduino Mega     |                |      ESP32       |
+//  |   Serial1 TX  ---->+--------------> |  RX 25           |
+//  |   Serial1 RX  <----+--------------< |  TX 26           |
+//  +--------------------+                +------------------+
+
 #include <Arduino.h>
 #include "Config.h"
 #include "SimpleComms.h"

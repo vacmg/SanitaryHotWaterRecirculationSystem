@@ -1,3 +1,10 @@
+// UART LINK: Arduino Mega <-> ESP32
+//  +--------------------+      UART      +------------------+
+//  |   Arduino Mega     |                |      ESP32       |
+//  |   Serial2 TX  ---->+--------------> |  RX 32           |
+//  |   Serial2 RX  <----+--------------< |  TX 33           |
+//  +--------------------+                +------------------+
+
 #include <Arduino.h>
 #include "Config.h"
 #include<avr/wdt.h> /* Header for watchdog timers in AVR*/
@@ -38,7 +45,7 @@ OneWire ourWire(TEMP_SENSOR); // Create Onewire instance for temp sensor
 DallasTemperature tempSensor(&ourWire); // Create temp sensor instance
 #endif
 
-SimpleComms comms(&Serial1, HEADER); // Create comms instance
+SimpleComms comms(&Serial2, HEADER); // Create comms instance
 
 typedef enum {Black, Red, Green, Blue, Yellow, Orange, Purple, Cyan, White, Gray} Color;
 
@@ -660,11 +667,11 @@ void setPump(bool enable, bool ignoreErrors = false)
     char errorBuff[ERROR_MESSAGE_SIZE] = "setPump - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
-    for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
+    for (int retries = 0, delayTime = PUMP_MESSAGE_PROCESSING_WAIT_TIME; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++, delayTime *= 2)
     {
         debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
         comms.sendCommand(pumpCMD, args, 1);
-        delay(PUMP_MESSAGE_PROCESSING_WAIT_TIME);
+        delay(delayTime);
         int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
         if(res > 0)
         {
@@ -1511,11 +1518,11 @@ void setup()
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
         Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR RS485 COMMUNICATION OVER SERIAL1"));
-        Serial1.begin(RS485_SERIAL_BAUD_RATE, SERIAL_7N1);
-        Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
+        Serial2.begin(RS485_SERIAL_BAUD_RATE, SERIAL_7N1);
+        Serial2.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #else
-        Serial1.begin(RS485_SERIAL_BAUD_RATE);
-        Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
+        Serial2.begin(RS485_SERIAL_BAUD_RATE);
+        Serial2.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #endif
 
     Serial.print(F("\nINFO: COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));

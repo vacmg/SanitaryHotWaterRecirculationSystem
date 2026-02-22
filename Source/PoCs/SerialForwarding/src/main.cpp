@@ -12,13 +12,13 @@ void setup()
     Serial.begin(115200);
 
 #if SC_USE_HAMMING_7_4_CORRECTION_CODE
-    Serial1.begin(9600, SERIAL_7N1);
+    Serial2.begin(9600, SERIAL_7N1);
 #else
-    Serial1.begin(9600, SERIAL_8N1);
+    Serial2.begin(9600, SERIAL_8N1);
 #endif
-    comms = new SimpleComms(&Serial1, "SHWRS");
+    comms = new SimpleComms(&Serial2, "SHWRS");
     delay(1000);
-    Serial.println("Starting Serial1 to Serial bridge");
+    Serial.println("Starting Serial2 to Serial bridge");
 
 #if SEND_COMPLEX_PAYLOAD_COMMAND
     Serial.println("Press any key to send complex payload command");
@@ -35,12 +35,12 @@ void setup()
 
 void loop()
 {
-    while (Serial1.available())
+    while (Serial2.available())
     {
         char buff[300];
         if(comms->getNextArgument(buff, sizeof(buff)) <= 0)
         {
-            Serial.println("Error reading command from Serial1");
+            Serial.println("Error reading command from Serial2");
         }
         Serial.println(buff);
     }

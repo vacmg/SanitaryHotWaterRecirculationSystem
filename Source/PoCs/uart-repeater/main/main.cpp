@@ -39,7 +39,7 @@ extern "C" void app_main()
     auto* SerialHamming = new HammingStream<7, 4>(Serial1);
     stream = SerialHamming;
 #else
-    Serial1.begin(9600, SERIAL_8N1, 25, 26);
+    Serial1.begin(9600, SERIAL_8N1, 32, 33);
     stream = &Serial1;
 #endif
 
