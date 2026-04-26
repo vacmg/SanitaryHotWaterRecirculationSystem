@@ -7,8 +7,8 @@
 
 #define UART_PORT_NUM UART_NUM_1
 #define UART_BAUD_RATE 9600
-#define UART_TX_PIN GPIO_NUM_25
-#define UART_RX_PIN GPIO_NUM_26
+#define UART_RX_PIN GPIO_NUM_32
+#define UART_TX_PIN GPIO_NUM_33
 #define BUF_SIZE 1024
 
 EspCANDriver*  driver = nullptr;

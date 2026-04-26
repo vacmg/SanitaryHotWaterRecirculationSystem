@@ -5,8 +5,8 @@
 #include "driver/gpio.h"
 
 // Definimos los pines y el tamaño del buffer
-#define RX2_PIN 25
-#define TX2_PIN 26
+#define RX2_PIN 32
+#define TX2_PIN 33
 #define BUF_SIZE 1024
 
 extern "C" void app_main(void) {
