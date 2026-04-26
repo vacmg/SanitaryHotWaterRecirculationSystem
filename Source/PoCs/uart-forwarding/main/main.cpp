@@ -1,63 +1,83 @@
-#include "Arduino.h"
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/uart.h"
+#include "driver/gpio.h"
 
-#define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
+// Definimos los pines y el tamaño del buffer
+#define RX2_PIN 32
+#define TX2_PIN 33
+#define BUF_SIZE 1024
 
-#include "EspCANDriver.h"
+extern "C" void app_main(void) {
+    /* =========================================
+       EQUIVALENTE A setup()
+       ========================================= */
 
-EspOSInterface osInterface;
+    // 1. Configuración de Serial2 (UART_NUM_2) a 9600 baudios, 8N1
+    uart_config_t uart2_config = {
+        .baud_rate = 9600,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
 
-[[noreturn]] void onSerialEvent(void* pvParameters)
-{
-    OSInterfaceLogInfo("onSerialEvent", "Starting task...");
+    // Instalamos el driver de UART2, aplicamos la configuración y asignamos los pines
+    uart_driver_install(UART_NUM_2, BUF_SIZE, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_2, &uart2_config);
+    uart_set_pin(UART_NUM_2, TX2_PIN, RX2_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    while (true) {
-        while (Serial.available())
-        {
-            auto byte = Serial.read();
-            OSInterfaceLogDebug("onSerialEvent", "Read byte from Serial: %d (0x%02X) (%c)", byte, byte, byte);
-            Serial1.write(byte);
+    // 2. Configuración de Serial (UART_NUM_0)
+    // ESP-IDF ya configura la salida de consola (printf) a 115200 baudios por defecto.
+    // Solo necesitamos instalar el driver para poder leer (rx) los datos entrantes de forma no bloqueante.
+    uart_driver_install(UART_NUM_0, BUF_SIZE, 0, 0, NULL, 0);
+
+    // delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // Serial.print(...) y Serial.flush()
+    printf("Ready on rx=%d; tx=%d\n", RX2_PIN, TX2_PIN);
+    fflush(stdout);
+
+    uint8_t data;
+    size_t length;
+
+    /* =========================================
+       EQUIVALENTE A loop()
+       ========================================= */
+    while (1) {
+
+        // if(Serial.available()) -> Revisamos si hay bytes en el buffer de UART0
+        uart_get_buffered_data_len(UART_NUM_0, &length);
+        if (length > 0) {
+            // Serial.read() -> Leemos 1 byte
+            if (uart_read_bytes(UART_NUM_0, &data, 1, 0) == 1) {
+                printf("Forwarding character %c\n", (char)data);
+                fflush(stdout);
+
+                // Serial2.write(r);
+                uart_write_bytes(UART_NUM_2, (const char*)&data, 1);
+            }
         }
-        while (Serial1.available())
-        {
-            auto byte = Serial1.read();
-            OSInterfaceLogDebug("onSerialEvent", "Read byte from Serial1: %d (0x%02X) (%c)", byte, byte, byte);
+
+        // if(Serial2.available()) -> Revisamos si hay bytes en el buffer de UART2
+        uart_get_buffered_data_len(UART_NUM_2, &length);
+        if (length > 0) {
+            // Serial2.read() -> Leemos 1 byte
+            if (uart_read_bytes(UART_NUM_2, &data, 1, 0) == 1) {
+                // Imprimimos ambas líneas tal como lo hacía tu código
+                printf("Received from Serial2 the character \n%c\n", (char)data);
+                fflush(stdout);
+
+                // Serial2.write(r);
+                // uart_write_bytes(UART_NUM_2, (const char*)&data, 1);
+            }
         }
+
+        // Añadimos un pequeño delay de 10ms (equivalente a yield)
+        // para que FreeRTOS pueda atender otras tareas y no salte el Watchdog timer.
         vTaskDelay(pdMS_TO_TICKS(10));
     }
-}
-
-extern "C" void app_main()
-{
-    OSInterfaceLogInfo("main", "Starting Arduino Core...");
-    initArduino();
-
-    OSInterfaceSetLogLevel("main", OSInterface_LOG_INFO);
-    OSInterfaceSetLogLevel(EspCANDriver::TAG, OSInterface_LOG_INFO);
-    OSInterfaceSetLogLevel("onCANEvent", OSInterface_LOG_INFO);
-    OSInterfaceSetLogLevel("onSerialEvent", OSInterface_LOG_DEBUG);
-
-    OSInterfaceLogInfo("main", "Starting UART driver...");
-    Stream* stream;
-#if SC_USE_HAMMING_7_4_CORRECTION_CODE
-    Serial1.begin(9600, SERIAL_7N1, 15, 17);
-    auto* SerialHamming = new HammingStream<7, 4>(Serial1);
-    stream = SerialHamming;
-#else
-    Serial1.begin(9600, SERIAL_8N1, 15, 17);
-    stream = &Serial1;
-#endif
-
-    OSInterfaceLogInfo("main", "Starting bridge tasks...");
-
-    xTaskCreate(onSerialEvent, "onSerialEvent", 4096, stream, 5, nullptr);
-
-    OSInterfaceLogInfo("main", "Ready.");
-
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    OSInterfaceLogInfo("main", "Sending test payload");
-    Serial1.println("Hello from Serial1!");
-
-    vTaskSuspend(nullptr);
-
-    // WARNING: if program reaches end of function app_main() the MCU will restart.
 }
