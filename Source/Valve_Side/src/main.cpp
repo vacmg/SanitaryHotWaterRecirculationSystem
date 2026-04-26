@@ -1,9 +1,9 @@
-// UART LINK: Arduino Mega <-> ESP32
-//  +--------------------+      UART      +------------------+
-//  |   Arduino Mega     |                |      ESP32       |
-//  |   Serial2 TX  ---->+--------------> |  RX 32           |
-//  |   Serial2 RX  <----+--------------< |  TX 33           |
-//  +--------------------+                +------------------+
+// UART LINK: Arduino Mega <-> ESP32 <-> Valve MCU
+//  +--------------------+      UART      +------------------+      CAN      +-------------------+
+//  |   Arduino Mega     |                |      ESP32       |               |     Heater MCU    |
+//  |   Serial2 TX  ---->+--------------> |  RX 32 CAN RX XX | <-----------< |     CAN TX        |
+//  |   Serial2 RX  <----+--------------< |  TX 33 CAN TX YY | >-----------> |     CAN RX        |
+//  +--------------------+                +------------------+               +-------------------+
 
 #include <Arduino.h>
 #include "Config.h"
