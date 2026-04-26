@@ -39,11 +39,11 @@ extern "C" void app_main()
     OSInterfaceLogInfo("main", "Starting UART driver...");
     Stream* stream;
 #if SC_USE_HAMMING_7_4_CORRECTION_CODE
-    Serial1.begin(9600, SERIAL_7N1, 25, 26);
+    Serial1.begin(9600, SERIAL_7N1, 15, 17);
     auto* SerialHamming = new HammingStream<7, 4>(Serial1);
     stream = SerialHamming;
 #else
-    Serial1.begin(9600, SERIAL_8N1, 25, 26);
+    Serial1.begin(9600, SERIAL_8N1, 15, 17);
     stream = &Serial1;
 #endif
 
@@ -52,6 +52,11 @@ extern "C" void app_main()
     xTaskCreate(onSerialEvent, "onSerialEvent", 4096, stream, 5, nullptr);
 
     OSInterfaceLogInfo("main", "Ready.");
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    OSInterfaceLogInfo("main", "Sending test payload");
+    Serial1.println("Hello from Serial1!");
+
     vTaskSuspend(nullptr);
 
     // WARNING: if program reaches end of function app_main() the MCU will restart.

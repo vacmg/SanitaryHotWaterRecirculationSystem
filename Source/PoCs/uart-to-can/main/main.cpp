@@ -1,34 +1,40 @@
-#include "Arduino.h"
+#include "driver/uart.h"
 #include <algorithm>
 
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
 
 #include "EspCANDriver.h"
 
+#define UART_PORT_NUM UART_NUM_1
+#define UART_BAUD_RATE 9600
+#define UART_TX_PIN GPIO_NUM_25
+#define UART_RX_PIN GPIO_NUM_26
+#define BUF_SIZE 1024
+
 EspCANDriver*  driver = nullptr;
 EspOSInterface osInterface;
 
-static void handleCANNoEvent(Stream* comms, const std::monostate& /*event*/)
+static void handleCANNoEvent(const std::monostate& /*event*/)
 {
     // Nothing to forward, keep debug log for visibility
     OSInterfaceLogDebug("onCANEvent", "No CAN event (monostate) received");
 }
 
-static void handleCANRXDoneEvent(Stream* comms, const CANRXDoneEvent& rxEvent)
+static void handleCANRXDoneEvent(const CANRXDoneEvent& rxEvent)
 {
     // Forward received bytes to the serial stream (cap to data array size)
-    auto bytesToWrite = std::min<uint16_t>(rxEvent.frame.dlc, static_cast<uint16_t>(sizeof(rxEvent.frame.data)));
-    comms->write(rxEvent.frame.data, bytesToWrite);
+    auto bytesToWrite = std::min<uint16_t>(rxEvent.frame.dlc, sizeof(rxEvent.frame.data));
+    uart_write_bytes(UART_PORT_NUM, rxEvent.frame.data, bytesToWrite);
     OSInterfaceLogInfo("onCANEvent", "Forwarding received data over Serial: %s", toString(rxEvent));
 }
 
-static void handleCANTXDoneEvent(Stream* /*comms*/, const CANTXDoneEvent& txEvent)
+static void handleCANTXDoneEvent(const CANTXDoneEvent& txEvent)
 {
     // For TX done we only log the result for now
     OSInterfaceLogInfo("onCANEvent", "TX completed: %s", toString(txEvent));
 }
 
-static void handleCANStateChangedEvent(Stream* /*comms*/, const CANStateChangedEvent& stateEvent)
+static void handleCANStateChangedEvent(const CANStateChangedEvent& stateEvent)
 {
     OSInterfaceLogInfo("onCANEvent", "CAN state changed: %s", toString(stateEvent));
 }
@@ -40,7 +46,6 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 [[noreturn]] void onSerialEvent(void* pvParameters)
 {
     OSInterfaceLogInfo("onSerialEvent", "Starting task...");
-    auto* comms = static_cast<Stream*>(pvParameters);
     CANFrame frame = {
             .id = {.N_AI = 0x1},
             .ide = true,
@@ -49,26 +54,29 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
     while (true) {
         buffLen = 0;
-        if (!comms->available()) {
+        size_t available = 0;
+        uart_get_buffered_data_len(UART_PORT_NUM, &available);
+        if (available == 0) {
             vTaskDelay(pdMS_TO_TICKS(10)); // Yield to other tasks
             continue;
         }
-        while (comms->available() && buffLen < sizeof(frame.data)) // We are not using null-terminated strings, be careful.
-        {
-            int dataByte = comms->read();
-            frame.data[buffLen++] = static_cast<uint8_t>(dataByte);
-            OSInterfaceLogDebug("onSerialEvent", "Read byte: %d (0x%02X) (%c) at position %u", dataByte, dataByte, dataByte, buffLen - 1);
+
+        int length = uart_read_bytes(UART_PORT_NUM, frame.data, sizeof(frame.data), pdMS_TO_TICKS(10));
+        if (length > 0) {
+            buffLen = length;
+            for (int i = 0; i < buffLen; i++) {
+                OSInterfaceLogDebug("onSerialEvent", "Read byte: %d (0x%02X) (%c) at position %d", frame.data[i], frame.data[i], frame.data[i], i);
+            }
+            frame.dlc = static_cast<uint8_t>(buffLen);
+            driver->sendFrame(frame, portMAX_DELAY);
+            OSInterfaceLogInfo("onSerialEvent", "Sent data \"%s\"", toString(frame));
         }
-        frame.dlc = static_cast<uint8_t>(buffLen);
-        driver->sendFrame(frame, portMAX_DELAY);
-        OSInterfaceLogInfo("onSerialEvent", "Sent data \"%s\"", toString(frame));
     }
 }
 
 [[noreturn]] void onCANEvent(void* pvParameters)
 {
     OSInterfaceLogInfo("onCANEvent", "Starting task...");
-    auto* comms = static_cast<Stream*>(pvParameters);
     while (true)
     {
         OSInterfaceLogDebug("onCANEvent", "Waiting for event from ISR...");
@@ -77,10 +85,10 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
         // Dispatch to the correct handler using std::visit and a set of overloads that forward
         std::visit(overloaded{
-                       [&](const std::monostate& e) { handleCANNoEvent(comms, e); },
-                       [&](const CANRXDoneEvent& e) { handleCANRXDoneEvent(comms, e); },
-                       [&](const CANTXDoneEvent& e) { handleCANTXDoneEvent(comms, e); },
-                       [&](const CANStateChangedEvent& e) { handleCANStateChangedEvent(comms, e); }
+                       [&](const std::monostate& e) { handleCANNoEvent(e); },
+                       [&](const CANRXDoneEvent& e) { handleCANRXDoneEvent(e); },
+                       [&](const CANTXDoneEvent& e) { handleCANTXDoneEvent(e); },
+                       [&](const CANStateChangedEvent& e) { handleCANStateChangedEvent(e); }
                    },
                    event);
     }
@@ -88,25 +96,25 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 extern "C" void app_main()
 {
-    OSInterfaceLogInfo("main", "Starting Arduino Core...");
-    initArduino();
-
     OSInterfaceSetLogLevel("main", OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel(EspCANDriver::TAG, OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel("onCANEvent", OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel("onSerialEvent", OSInterface_LOG_DEBUG);
 
-
     OSInterfaceLogInfo("main", "Starting UART driver...");
-    Stream* stream;
-#if SC_USE_HAMMING_7_4_CORRECTION_CODE
-    Serial1.begin(9600, SERIAL_7N1, 25, 26);
-    auto* SerialHamming = new HammingStream<7, 4>(Serial1);
-    stream = SerialHamming;
-#else
-    Serial1.begin(9600, SERIAL_8N1, 25, 26);
-    stream = &Serial1;
-#endif
+
+    uart_config_t uart_config = {
+        .baud_rate = UART_BAUD_RATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+
+    ESP_ERROR_CHECK(uart_driver_install(UART_PORT_NUM, BUF_SIZE * 2, 0, 0, NULL, 0));
+    ESP_ERROR_CHECK(uart_param_config(UART_PORT_NUM, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
     OSInterfaceLogInfo("main", "Starting CAN driver...");
     constexpr twai_onchip_node_config_t node_config = {
@@ -131,8 +139,8 @@ extern "C" void app_main()
 
     OSInterfaceLogInfo("main", "Starting bridge tasks...");
 
-    xTaskCreate(onCANEvent, "onCANEvent", 4096, stream, 5, nullptr);
-    xTaskCreate(onSerialEvent, "onSerialEvent", 4096, stream, 5, nullptr);
+    xTaskCreate(onCANEvent, "onCANEvent", 4096, nullptr, 5, nullptr);
+    xTaskCreate(onSerialEvent, "onSerialEvent", 4096, nullptr, 5, nullptr);
 
     OSInterfaceLogInfo("main", "Ready.");
     vTaskSuspend(nullptr);
