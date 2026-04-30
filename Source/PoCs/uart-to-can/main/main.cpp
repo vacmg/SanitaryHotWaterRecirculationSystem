@@ -97,7 +97,7 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 extern "C" void app_main()
 {
     OSInterfaceSetLogLevel("main", OSInterface_LOG_INFO);
-    OSInterfaceSetLogLevel(EspCANDriver::TAG, OSInterface_LOG_INFO);
+    OSInterfaceSetLogLevel(EspCANDriver::TAG, OSInterface_LOG_DEBUG);
     OSInterfaceSetLogLevel("onCANEvent", OSInterface_LOG_INFO);
     OSInterfaceSetLogLevel("onSerialEvent", OSInterface_LOG_DEBUG);
 
