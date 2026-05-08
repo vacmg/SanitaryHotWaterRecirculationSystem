@@ -122,8 +122,8 @@ extern "C" void app_main()
             .clk_src        = TWAI_CLK_SRC_DEFAULT,
             .bit_timing     = {.bitrate = 200000}, // 200 kbps bitrate
             .tx_queue_depth = 5,                   // Transmit queue depth set to 5
-            .flags          = {.enable_self_test   = true,
-                    .enable_loopback    = true,
+            .flags          = {.enable_self_test   = false,
+                    .enable_loopback    = false,
                     .enable_listen_only = false,
                     .no_receive_rtr     = false},
     };
