@@ -118,7 +118,7 @@ extern "C" void app_main()
 
     OSInterfaceLogInfo("main", "Starting CAN driver...");
     constexpr twai_onchip_node_config_t node_config = {
-            .io_cfg         = {.tx = GPIO_NUM_4, .rx = GPIO_NUM_5}, // TWAI TX GPIO pin// TWAI RX GPIO pin
+            .io_cfg         = {.tx = GPIO_NUM_22, .rx = GPIO_NUM_23}, // TWAI TX GPIO pin// TWAI RX GPIO pin
             .clk_src        = TWAI_CLK_SRC_DEFAULT,
             .bit_timing     = {.bitrate = 200000}, // 200 kbps bitrate
             .tx_queue_depth = 5,                   // Transmit queue depth set to 5
