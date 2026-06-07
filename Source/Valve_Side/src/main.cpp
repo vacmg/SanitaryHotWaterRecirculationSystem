@@ -24,7 +24,7 @@
 #include "Errors.h"
 #include "FSM.h"
 
-#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enable' or 'disable' to disable or enable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'changemode' to change the operation mode to the next one (similar to pressing the button);\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
+#define MAIN_HELP_STRING "\nType 'reboot' to restart the system;\n'enable' or 'disable' to disable or enable the fallback mode;\n'clear' to invalidate the Error Register;\n'sensors' to print all the sensors current value;\n'systeminfo' to print the system configuration;\n'changemode' to change the operation mode to the next one (similar to pressing the button);\n'startpump' or 'stoppump' to manually start or stop the pump;\n'openvalve' or 'closevalve' to manually open or close the valve;\n'errorlist' to print the error list;\n'reset' or 'reseton' to clear the error list and enable or disable the fallback mode"
 #define MOCK_SENSORS_HELP_STRING "\nPress 'e' or 'd' to enable or disable trigger;\nPress 'n', 's' or 'l' to set the button to NO_PULSE, SHORT_PULSE or LONG_PULSE;\nSend a number to incorporate it as the valve temp\n"
 
 // Global instances
@@ -199,19 +199,17 @@ void printSystemInfo()
 void printSensorsInfo()
 {
     Serial.println(F("\n-----------------------------------------"));
-    printSystemInfo();
-    Serial.println(F("Sensor list:\n"));
+    Serial.println(F("[ Sensors ]\n"));
     #if MOCK_SENSORS
-    Serial.println(F("Valve pressure sensor: MOCKED"));
-    Serial.print(F("Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp);Serial.println(F("ºC"));
+    Serial.println(F("  Valve pressure sensor: MOCKED"));
+    Serial.print(F("  Valve temperature sensor: MOCKED to ")); Serial.print(valveTemp); Serial.println(F("ºC"));
     #else
-    Serial.print(F("Valve pressure sensor: ")); Serial.print(getValvePressure(true));Serial.println(F("BAR"));
-    Serial.print(F("Valve temperature sensor: ")); Serial.print(getValveTemp(true));Serial.println(F("ºC"));
+    Serial.print(F("  Valve pressure sensor: ")); Serial.print(getValvePressure(true)); Serial.println(F(" BAR"));
+    Serial.print(F("  Valve temperature sensor: ")); Serial.print(getValveTemp(true)); Serial.println(F("ºC"));
     #endif
     int heaterTemp = getHeaterTemp(true);
-    Serial.print(F("Heater temperature sensor: ")); Serial.print(heaterTemp);Serial.println(F("ºC"));
-    Serial.print(F("Desired temperature: ")); Serial.print(getDesiredTemp(heaterTemp));Serial.println(F("ºC"));
-
+    Serial.print(F("  Heater temperature sensor: ")); Serial.print(heaterTemp); Serial.println(F("ºC"));
+    Serial.print(F("  Desired temperature: ")); Serial.print(getDesiredTemp(heaterTemp)); Serial.println(F("ºC"));
     Serial.println(F("-----------------------------------------\n"));
 }
 
@@ -266,6 +264,10 @@ void serialEvent()
     else if(strstr(buffer,"disable") != nullptr)
     {
         toggleFallbackMode(true);
+    }
+    else if(strstr(buffer,"systeminfo") != nullptr)
+    {
+        printSystemInfo();
     }
     else if(strstr(buffer,"sensors") != nullptr)
     {
