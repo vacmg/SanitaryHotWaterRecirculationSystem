@@ -191,6 +191,7 @@ void serialEvent()
     else if(strstr(buffer,"reseton") != nullptr)
     {
         invalidateErrorData();
+        clearProfilerData();
         currentMode = OnPressureTrigger;
         toggleFallbackMode(false);
         raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_REBOOT_RESET_DISABLE_FALLBACK);
@@ -198,6 +199,7 @@ void serialEvent()
     else if(strstr(buffer,"reset") != nullptr)
     {
         invalidateErrorData();
+        clearProfilerData();
         currentMode = OnPressureTrigger;
         toggleFallbackMode(true);
         raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_REBOOT_RESET_ENABLE_FALLBACK);
