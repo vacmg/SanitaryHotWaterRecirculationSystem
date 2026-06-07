@@ -123,11 +123,11 @@ void printSystemInfo()
     Serial.println(F("[ Fallback / Error Counter ]"));
     Serial.print(F("  raiseError counter:            ")); Serial.println(getRaiseErrorCounter());
     Serial.print(F("  Fallback threshold (>):        ")); Serial.println(ERROR_COUNT_TO_ENABLE_FALLBACK_MODE);
-    Serial.print(F("  Counter reset timeout (ms):    ")); Serial.println(FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS);
+    Serial.print(F("  Counter reset timeout:         ")); Serial.println(formattedTime(FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS, buff));
 
     // --- Watchdog / restart ---
     Serial.println(F("[ Watchdog / Restart ]"));
-    Serial.print(F("  Watchdog reset period (ms):    ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
+    Serial.print(F("  Watchdog reset period     :    ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
     Serial.print(F("  System reset period:           ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD, buff));
 
     // --- Communications ---
