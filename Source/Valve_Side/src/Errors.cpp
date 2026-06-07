@@ -195,8 +195,11 @@ static void initializeErrorStorageIfNecessary()
 
     const bool invalidHeader =
         header.magic != EEPROM_ERROR_HEADER_MAGIC ||
-        header.layoutVersion != EEPROM_ERROR_LAYOUT_VERSION ||
-        header.buildId != EEPROM_BUILD_ID;
+        header.layoutVersion != EEPROM_ERROR_LAYOUT_VERSION
+        #if EEPROM_CLEAR_ON_BUILD_ID_CHANGE
+        || header.buildId != EEPROM_BUILD_ID
+        #endif
+        ;
 
     if(!invalidHeader)
     {

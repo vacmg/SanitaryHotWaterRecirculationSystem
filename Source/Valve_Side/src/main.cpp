@@ -102,6 +102,7 @@ void printSystemInfo()
     Serial.print(F("  SC_USE_HAMMING_7_4:            ")); Serial.println(SC_USE_HAMMING_7_4_CORRECTION_CODE);
     Serial.print(F("  ENABLE_AUTO_RESTART:           ")); Serial.println(ENABLE_AUTO_RESTART);
     Serial.print(F("  EEPROM_DONT_WRITE_ERRORS:      ")); Serial.println(EEPROM_DONT_WRITE_ERRORS);
+    Serial.print(F("  EEPROM_CLEAR_ON_BUILD_ID:      ")); Serial.println(EEPROM_CLEAR_ON_BUILD_ID_CHANGE);
 
     // --- EEPROM layout ---
     Serial.println(F("[ EEPROM Layout ]"));
