@@ -132,7 +132,7 @@ void printSystemInfo()
     // --- Communications ---
     Serial.println(F("[ Communications ]"));
     Serial.print(F("  USB baud rate:                 ")); Serial.println(SERIAL_USB_BAUD_RATE);
-    Serial.print(F("  RS485 baud rate:               ")); Serial.println(RS485_SERIAL_BAUD_RATE);
+    Serial.print(F("  UART baud rate:                ")); Serial.println(UART_SERIAL_BAUD_RATE);
     Serial.print(F("  Comms header:                  ")); Serial.println(HEADER);
     Serial.print(F("  Comms max retries:             ")); Serial.println(COMMS_MAX_RETRIES);
     Serial.print(F("  Comms msg max length:          ")); Serial.println(SC_MAX_MESSAGE_SIZE);
@@ -445,15 +445,15 @@ void setup()
     Serial.println(F("Starting..."));
 
     #if SC_USE_HAMMING_7_4_CORRECTION_CODE
-        Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR RS485 COMMUNICATION OVER SERIAL1"));
-        Serial2.begin(RS485_SERIAL_BAUD_RATE, SERIAL_7N1);
+        Serial.println(F("INFO: HAMMING 7,4 CORRECTION CODE ENABLED FOR UART COMMUNICATION OVER SERIAL1"));
+        Serial2.begin(UART_SERIAL_BAUD_RATE, SERIAL_7N1);
         Serial2.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #else
-        Serial2.begin(RS485_SERIAL_BAUD_RATE);
+        Serial2.begin(UART_SERIAL_BAUD_RATE);
         Serial2.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #endif
 
-    Serial.print(F("\nINFO: COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
+    Serial.print(F("\nINFO: COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(UART_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
 
     // Initialize sensors
     sensorsInit();

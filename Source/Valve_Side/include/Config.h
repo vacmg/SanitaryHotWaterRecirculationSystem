@@ -116,7 +116,7 @@ static_assert(EEPROM_ERROR_MEMORY_ITEMS > 0, "Not enough EEPROM space for error 
 
 
 constexpr uint32_t SERIAL_USB_BAUD_RATE = 115200;
-constexpr uint32_t RS485_SERIAL_BAUD_RATE = 9600;
+constexpr uint32_t UART_SERIAL_BAUD_RATE = 9600;
 
 constexpr float MIN_ALLOWED_TEMP = 6; // 6ºC
 constexpr float MAX_ALLOWED_TEMP = 70; // 70ºc

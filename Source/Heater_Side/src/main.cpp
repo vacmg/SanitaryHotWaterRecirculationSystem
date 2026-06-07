@@ -335,11 +335,11 @@ void setup()
         Serial1.begin(RS485_SERIAL_BAUD_RATE, SERIAL_7N1);
         Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #else
-        Serial1.begin(RS485_SERIAL_BAUD_RATE);
+        Serial1.begin(UART_SERIAL_BAUD_RATE);
         Serial1.setTimeout(RECEIVED_MESSAGE_TIMEOUT);
     #endif
 
-    Serial.print(F("\nINFO: COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(RS485_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
+    Serial.print(F("\nINFO: COMMUNICATION OVER SERIAL1 ENABLED WITH A SPEED OF ")); Serial.print(UART_SERIAL_BAUD_RATE); Serial.println(F(" BAUDS"));
 
     delay(1000);
 
