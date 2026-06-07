@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include "Config.h"
+#include "Pinout.h"
 #include <avr/wdt.h> /* Header for watchdog timers in AVR*/
 #include <EEPROM.h>
 #include <MAX_RS485.h>
@@ -80,7 +81,9 @@ void printSystemInfo()
     Serial.print(F("Watchdogs reset period: ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
     Serial.print(F("FallBack Mode ")); Serial.println(currentMode==ErrorFallBackMode?"Enabled":"Disabled");
     Serial.print(F("Comms max retries: ")); Serial.println(COMMS_MAX_RETRIES);
-    Serial.print(F("Error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
+    Serial.print(F("Transient error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
+    Serial.print(F("EEPROM error slot size: ")); Serial.println(sizeof(EEPROMError));
+    Serial.print(F("EEPROM error slots: ")); Serial.println(EEPROM_ERROR_MEMORY_ITEMS);
     Serial.print(F("Comms message max length: ")); Serial.println(SC_MAX_MESSAGE_SIZE);
     Serial.print(F("Mode: ")); Serial.println(modeToString(currentMode));
     Serial.print(F("Status: ")); Serial.println(statusToString(currentStatus));
@@ -111,7 +114,7 @@ void checkResetTime()
 {
     if((currentMode != ErrorFallBackMode) && (millis() > SYSTEM_RESET_PERIOD))
     {
-        raiseError(NO_ERROR, F("INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout"));
+        raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_SYSTEM_RESET_TIMEOUT);
     }
 }
 #endif
@@ -139,7 +142,7 @@ void serialEvent()
     }
     else if(strstr(buffer,"reboot") != nullptr)
     {
-        raiseError(NO_ERROR, F("Rebooting by user command"));
+        raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_REBOOT_USER_COMMAND);
     }
     else if(strstr(buffer,"clear") != nullptr)
     {
@@ -187,14 +190,14 @@ void serialEvent()
         invalidateErrorData();
         currentMode = OnPressureTrigger;
         toggleFallbackMode(false);
-        raiseError(NO_ERROR, F("Rebooting to complete reset and disable fallback mode"));
+        raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_REBOOT_RESET_DISABLE_FALLBACK);
     }
     else if(strstr(buffer,"reset") != nullptr)
     {
         invalidateErrorData();
         currentMode = OnPressureTrigger;
         toggleFallbackMode(true);
-        raiseError(NO_ERROR, F("Rebooting to complete reset and enable fallback mode"));
+        raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_REBOOT_RESET_ENABLE_FALLBACK);
     }
 
 #if MOCK_SENSORS
@@ -311,7 +314,7 @@ void setup()
                         setValve(valveSt);
                         break;
                     case LONG_PULSE:
-                        raiseError(NO_ERROR, F("Rebooting by user command (button long press)"));
+                        raiseErrorWithTemplate(NO_ERROR, ERROR_MSG_TEMPLATE_INFO_REBOOT_BUTTON_LONG_PRESS);
                     default:
                         break;
                 }

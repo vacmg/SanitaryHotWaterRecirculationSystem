@@ -45,6 +45,12 @@ float temp = 0;
 char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
 char lastCommand[PROFILER_DATA_MSG_SIZE] = "";
 
+#if PROFILER_ENABLED
+unsigned long profilerMillis = 0;
+const ProfilerData defaultProfilerData = {0XABDCEF12, INT32_MAX, 0, "", ""};
+ProfilerData profilerData = defaultProfilerData;
+#endif
+
 
 const char* formattedTime(long milliseconds, char* buff)
 {

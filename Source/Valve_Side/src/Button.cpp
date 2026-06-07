@@ -1,6 +1,7 @@
 #include "Button.h"
 #include "Config.h"
 #include "Globals.h"
+#include "Pinout.h"
 #include "HeaterControl.h"
 
 ButtonStatus readButton(bool avoidWatchdogReset)

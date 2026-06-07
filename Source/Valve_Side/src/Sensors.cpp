@@ -1,5 +1,6 @@
 #include "Sensors.h"
 #include "Config.h"
+#include "Pinout.h"
 #include "Globals.h"
 #include "Errors.h"
 #include "Utils.h"
@@ -51,16 +52,13 @@ void getValveTempIfNecessary(bool ignoreErrors)
             debug(F("Temp read: ")); debugln(valveTemp);
         #endif
 
-        char errorBuff[ERROR_MESSAGE_SIZE];
         if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
         {
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
-            raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+            raiseErrorWithValue(ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_VALVE_TEMP_TOO_LOW, valveTemp);
         }
         if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
         {
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
-            raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+            raiseErrorWithValue(ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_VALVE_TEMP_TOO_HIGH, valveTemp);
         }
         valveTempRequested = false;
         tempRequestReady = true;
@@ -76,16 +74,13 @@ float getValveTemp(bool ignoreErrors)
     tempSensor.requestTemperatures();
     valveTemp = tempSensor.getTempCByIndex(0);
 
-    char errorBuff[ERROR_MESSAGE_SIZE];
     if(!ignoreErrors && valveTemp<MIN_ALLOWED_TEMP)
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
-        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+        raiseErrorWithValue(ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_VALVE_TEMP_TOO_LOW, valveTemp);
     }
     if(!ignoreErrors && valveTemp>MAX_ALLOWED_TEMP)
     {
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("VALVE TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
-        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+        raiseErrorWithValue(ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_VALVE_TEMP_TOO_HIGH, valveTemp);
     }
 
     tempSensor.setWaitForConversion(false);
@@ -104,9 +99,7 @@ double getValvePressure(bool ignoreErrors)
 
     if(!ignoreErrors && !(pressureSensorCurrent >= MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA && pressureSensorCurrent <= MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA))
     {
-        char errorBuff[ERROR_MESSAGE_SIZE];
-        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("PRESSURE CURRENT (%dmA) IS OUTSIDE THE RANGE (%d, %d)mA"),static_cast<int>(pressureSensorCurrent), static_cast<int>(MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA), static_cast<int>(MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA));
-        raiseError(ERROR_PRESSURE_SENSOR_INVALID_VALUE,errorBuff);
+        raiseErrorWithValue(ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_PRESSURE_CURRENT_OUTSIDE_RANGE, static_cast<float>(pressureSensorCurrent));
     }
 
     return fmap(pressureSensorCurrent, PRESSURE_SENSOR_CURRENT_MIN_mA, PRESSURE_SENSOR_CURRENT_MAX_mA, PRESSURE_SENSOR_MIN_BAR, PRESSURE_SENSOR_MAX_BAR);

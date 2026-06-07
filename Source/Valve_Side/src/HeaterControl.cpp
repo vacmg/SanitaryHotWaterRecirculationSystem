@@ -3,7 +3,7 @@
 #include "Globals.h"
 #include "Errors.h"
 #include "Utils.h"
-#include "Button.h"
+#include "Pinout.h"
 
 void setValve(bool enable)
 {
@@ -20,12 +20,12 @@ void setPump(bool enable, bool ignoreErrors)
 
     debug(enable?F("Starting pump... "):F("Stopping pump... ")); if(ignoreErrors) {debug(F("Ignoring errors"));} debugln();
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "setPump - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
+    ErrorMessageTemplate errTemplate = ERROR_MSG_TEMPLATE_NONE;
     for (int retries = 0, delayTime = PUMP_MESSAGE_PROCESSING_WAIT_TIME; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++, delayTime *= 2)
     {
-        debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+        debug(F("Retry number ")); debugln(retries);
         comms.sendCommand(pumpCMD, args, 1);
         delay(delayTime);
         int res = comms.getNextCommand(commsBuffer, SC_MAX_MESSAGE_SIZE);
@@ -54,21 +54,22 @@ void setPump(bool enable, bool ignoreErrors)
             }
             else
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at setPump: %s"), commsBuffer);
+                debug(F("Unexpected response payload in setPump: ")); debugln(commsBuffer);
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                errTemplate = ERROR_MSG_TEMPLATE_UNEXPECTED_SET_PUMP;
             }
         }
         else if(!ignoreErrors)
         {
             if(res == 0)
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Timeout receiving setPump response"));
                 err = ERROR_COMMS_NO_RESPONSE;
+                errTemplate = ERROR_MSG_TEMPLATE_TIMEOUT_SET_PUMP;
             }
             else
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header in setPump"));
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                errTemplate = ERROR_MSG_TEMPLATE_PARSE_HEADER_SET_PUMP;
             }
         }
         else
@@ -79,7 +80,7 @@ void setPump(bool enable, bool ignoreErrors)
 
     if(err != NO_ERROR)
     {
-        raiseError(err, errorBuff);
+        raiseErrorWithTemplate(err, errTemplate);
     }
 }
 
@@ -130,18 +131,17 @@ void setPumpTimeout(long timeout)
         }
         else
         {
-            char errorBuff[ERROR_MESSAGE_SIZE];
-            snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at setPumpTimeout: %s"), commsBuffer);
-            raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
+            debug(F("Unexpected response payload in setPumpTimeout: ")); debugln(commsBuffer);
+            raiseErrorWithTemplate(ERROR_COMMS_UNEXPECTED_MESSAGE, ERROR_MSG_TEMPLATE_UNEXPECTED_SET_PUMP_TIMEOUT);
         }
     }
     else if(res == 0)
     {
-        raiseError(ERROR_COMMS_NO_RESPONSE, F("Timeout receiving setPumpTimeout response"));
+        raiseErrorWithTemplate(ERROR_COMMS_NO_RESPONSE, ERROR_MSG_TEMPLATE_TIMEOUT_SET_PUMP_TIMEOUT);
     }
     else
     {
-        raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, F("Unable to parse message header in setPumpTimeout"));
+        raiseErrorWithTemplate(ERROR_COMMS_UNEXPECTED_MESSAGE, ERROR_MSG_TEMPLATE_PARSE_HEADER_SET_PUMP_TIMEOUT);
     }
 }
 
@@ -152,13 +152,13 @@ int getHeaterTemp(bool ignoreErrors)
         debugln(F("Getting heater temp..."));
     }
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "getHeaterTemp - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
+    ErrorMessageTemplate errTemplate = ERROR_MSG_TEMPLATE_NONE;
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
     {
         #if DEBUGTEMP
-        debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+        debug(F("Retry number ")); debugln(retries);
         #endif
         comms.sendCommand(tempCMD, nullptr, 0);
         delay(TEMP_MESSAGE_PROCESSING_WAIT_TIME);
@@ -179,20 +179,18 @@ int getHeaterTemp(bool ignoreErrors)
                     const long temp = strtol(commsBuffer, nullptr, 10);
                     if(!ignoreErrors && static_cast<float>(temp) < MIN_ALLOWED_TEMP)
                     {
-                        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("HEATER TEMP IS TOO LOW (%d)"),static_cast<int>(valveTemp));
-                        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+                        raiseErrorWithValue(ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_HEATER_TEMP_TOO_LOW, static_cast<float>(temp));
                     }
                     if(!ignoreErrors && static_cast<float>(temp) > MAX_ALLOWED_TEMP)
                     {
-                        snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("HEATER TEMP IS TOO HIGH (%d)"),static_cast<int>(valveTemp));
-                        raiseError(ERROR_TEMP_SENSOR_INVALID_VALUE, errorBuff);
+                        raiseErrorWithValue(ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_MSG_TEMPLATE_HEATER_TEMP_TOO_HIGH, static_cast<float>(temp));
                     }
                     return static_cast<int>(temp);
                 }
                 if(!ignoreErrors)
                 {
-                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("No temperature value received from the HEATER MCU"));
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                    errTemplate = ERROR_MSG_TEMPLATE_NO_HEATER_TEMP_VALUE;
                 }
                 else
                 {
@@ -219,8 +217,9 @@ int getHeaterTemp(bool ignoreErrors)
             {
                 if(!ignoreErrors)
                 {
-                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at getHeaterTemp: %s"), commsBuffer);
+                    debug(F("Unexpected response payload in getHeaterTemp: ")); debugln(commsBuffer);
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                    errTemplate = ERROR_MSG_TEMPLATE_UNEXPECTED_GET_HEATER_TEMP;
                 }
                 else
                 {
@@ -234,13 +233,13 @@ int getHeaterTemp(bool ignoreErrors)
             {
                 if(res == 0)
                 {
-                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Timeout receiving getTemp response"));
                     err = ERROR_COMMS_NO_RESPONSE;
+                    errTemplate = ERROR_MSG_TEMPLATE_TIMEOUT_GET_TEMP;
                 }
                 else
                 {
-                    snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header in getTemp"));
                     err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                    errTemplate = ERROR_MSG_TEMPLATE_PARSE_HEADER_GET_TEMP;
                 }
             }
             else
@@ -252,7 +251,7 @@ int getHeaterTemp(bool ignoreErrors)
 
     if(err != NO_ERROR)
     {
-        raiseError(err, errorBuff);
+        raiseErrorWithTemplate(err, errTemplate);
     }
 
     return 0;
@@ -303,9 +302,8 @@ void connectToHeater(bool ignoreErrors)
             }
             else if(!ignoreErrors)
             {
-                char errorBuff[ERROR_MESSAGE_SIZE];
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at connectToHeater: %s"), commsBuffer);
-                raiseError(ERROR_COMMS_UNEXPECTED_MESSAGE, errorBuff);
+                debug(F("Unexpected response payload in connectToHeater: ")); debugln(commsBuffer);
+                raiseErrorWithTemplate(ERROR_COMMS_UNEXPECTED_MESSAGE, ERROR_MSG_TEMPLATE_UNEXPECTED_CONNECT_HEATER);
             }
         }
         #if DEBUGCONNECT
@@ -330,7 +328,7 @@ void connectToHeater(bool ignoreErrors)
     {
         if(!ignoreErrors)
         {
-            raiseError(ERROR_COMMS_CONNECTION_NOT_ESTABLISHED, F("Timeout connecting to the HEATER MCU"));
+            raiseErrorWithTemplate(ERROR_COMMS_CONNECTION_NOT_ESTABLISHED, ERROR_MSG_TEMPLATE_TIMEOUT_CONNECT_HEATER);
         }
         else
         {
@@ -381,13 +379,13 @@ void resetWatchdogs()
         debugln(F("Watchdogs reset in progress..."));
     #endif
 
-    char errorBuff[ERROR_MESSAGE_SIZE] = "resetWatchdogs - NoError";
     char commsBuffer[SC_MAX_MESSAGE_SIZE+1] = "";
     ErrorCode err = ENUM_LEN; // Some invalid value to enter the loop, must be overwritten no matter what branch is taken.
+    ErrorMessageTemplate errTemplate = ERROR_MSG_TEMPLATE_NONE;
     for (int retries = 0; err != NO_ERROR && retries<COMMS_MAX_RETRIES; retries++)
     {
         #if DEBUGWATCHDOG
-            debug(F("Retry number ")); debug(retries); debug(F("\tCurrent error string: ")); debugln(errorBuff);
+            debug(F("Retry number ")); debugln(retries);
         #endif
         comms.sendCommand(WTDRSTCMD, nullptr, 0);
         delay(WDT_RST_MESSAGE_PROCESSING_WAIT_TIME);
@@ -404,8 +402,9 @@ void resetWatchdogs()
             }
             else if (currentMode != ErrorFallBackMode)
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unexpected response from the HEATER MCU at resetWatchdogs: %s"), commsBuffer);
+                debug(F("Unexpected response payload in resetWatchdogs: ")); debugln(commsBuffer);
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                errTemplate = ERROR_MSG_TEMPLATE_UNEXPECTED_RESET_WATCHDOGS;
             }
             else
             {
@@ -416,13 +415,13 @@ void resetWatchdogs()
         {
             if(res == 0)
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Timeout receiving WTD-RST response"));
                 err = ERROR_COMMS_NO_RESPONSE;
+                errTemplate = ERROR_MSG_TEMPLATE_TIMEOUT_WTD_RST;
             }
             else
             {
-                snprintf_P(errorBuff, ERROR_MESSAGE_SIZE, PSTR("Unable to parse message header in resetWatchdogs"));
                 err = ERROR_COMMS_UNEXPECTED_MESSAGE;
+                errTemplate = ERROR_MSG_TEMPLATE_PARSE_HEADER_RESET_WATCHDOGS;
             }
         }
         else
@@ -433,7 +432,7 @@ void resetWatchdogs()
 
     if(err != NO_ERROR)
     {
-        raiseError(err, errorBuff);
+        raiseErrorWithTemplate(err, errTemplate);
     }
 }
 

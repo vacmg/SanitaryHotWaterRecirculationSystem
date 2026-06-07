@@ -1,5 +1,6 @@
 #include "Leds.h"
 #include "Config.h"
+#include "Pinout.h"
 
 RGBColor getRGBColor(const Color color)
 {

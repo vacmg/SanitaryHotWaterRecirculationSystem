@@ -8,8 +8,11 @@
 void invalidateErrorData();
 void printErrorData();
 void toggleFallbackMode(bool enableFallBackMode);
-[[noreturn]] void raiseError(ErrorCode error, const char* message = nullptr);
-[[noreturn]] void raiseError(ErrorCode error, const __FlashStringHelper* message);
+[[noreturn]] void raiseErrorImpl(ErrorCode error, ErrorMessageTemplate messageTemplate, float value, const char* file, uint16_t line);
 void handleHeaterError(int retryCount, char* buff = nullptr);
+
+#define raiseError(error) raiseErrorImpl((error), ERROR_MSG_TEMPLATE_NONE, EEPROM_ERROR_VALUE_NOT_SET, __FILE__, __LINE__)
+#define raiseErrorWithTemplate(error, messageTemplate) raiseErrorImpl((error), (messageTemplate), EEPROM_ERROR_VALUE_NOT_SET, __FILE__, __LINE__)
+#define raiseErrorWithValue(error, messageTemplate, value) raiseErrorImpl((error), (messageTemplate), (value), __FILE__, __LINE__)
 
 #endif // ERRORS_H

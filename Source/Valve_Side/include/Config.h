@@ -6,6 +6,7 @@
 #define CONFIG_H
 
 #include<avr/wdt.h>
+#include <math.h>
 
 #ifndef WDTO_8S
 #error This sketch is only compatible with an some arduinos with avr architecture due to the watchdog timer used (8s). However, with some modifications to the timings in the program, it is possible to run it in other platforms. For more info check this: https://www.nongnu.org/avr-libc/user-manual/wdt_8h_source.html
@@ -27,33 +28,78 @@
 #define SC_USE_HAMMING_7_4_CORRECTION_CODE 0
 #define ENABLE_AUTO_RESTART 1
 #define EEPROM_DONT_WRITE_ERRORS 0 // Only works for errors
-#define EEPROM_ERROR_MEMORY_ITEMS 5
 #define EEPROM_MODE_ADDRESS 0
 #define EEPROM_FALLBACK_MODE_ENABLED_ADDRESS 8
 #define EEPROM_ERROR_START_ADDRESS 16
 #define ERROR_MESSAGE_SIZE 128
 #define PROFILER_DATA_START_ADDRESS 700
 #define PROFILER_DATA_MSG_SIZE 64
+#define EEPROM_ERROR_FILE_SIZE 20
+
+#ifndef EEPROM_BUILD_ID
+#define EEPROM_BUILD_ID 0UL
+#endif
+
+constexpr uint16_t EEPROM_ERROR_HEADER_MAGIC = 0xE220;
+constexpr uint16_t EEPROM_ERROR_LAYOUT_VERSION = 3;
+constexpr float EEPROM_ERROR_VALUE_NOT_SET = NAN;
 
 typedef enum {NO_ERROR = 0, ERROR_TEMP_SENSOR_INVALID_VALUE, ERROR_PRESSURE_SENSOR_INVALID_VALUE, ERROR_COMMS_CONNECTION_NOT_ESTABLISHED, ERROR_COMMS_NO_RESPONSE, ERROR_COMMS_UNEXPECTED_MESSAGE, ERROR_HEATER_MCU_ERROR,             ENUM_LEN} ErrorCode;
+
+typedef enum {
+    ERROR_MSG_TEMPLATE_NONE = 0,
+    ERROR_MSG_TEMPLATE_VALVE_TEMP_TOO_LOW,
+    ERROR_MSG_TEMPLATE_VALVE_TEMP_TOO_HIGH,
+    ERROR_MSG_TEMPLATE_HEATER_TEMP_TOO_LOW,
+    ERROR_MSG_TEMPLATE_HEATER_TEMP_TOO_HIGH,
+    ERROR_MSG_TEMPLATE_PRESSURE_CURRENT_OUTSIDE_RANGE,
+    ERROR_MSG_TEMPLATE_TIMEOUT_SET_PUMP,
+    ERROR_MSG_TEMPLATE_PARSE_HEADER_SET_PUMP,
+    ERROR_MSG_TEMPLATE_UNEXPECTED_SET_PUMP,
+    ERROR_MSG_TEMPLATE_TIMEOUT_SET_PUMP_TIMEOUT,
+    ERROR_MSG_TEMPLATE_PARSE_HEADER_SET_PUMP_TIMEOUT,
+    ERROR_MSG_TEMPLATE_UNEXPECTED_SET_PUMP_TIMEOUT,
+    ERROR_MSG_TEMPLATE_TIMEOUT_GET_TEMP,
+    ERROR_MSG_TEMPLATE_PARSE_HEADER_GET_TEMP,
+    ERROR_MSG_TEMPLATE_UNEXPECTED_GET_HEATER_TEMP,
+    ERROR_MSG_TEMPLATE_NO_HEATER_TEMP_VALUE,
+    ERROR_MSG_TEMPLATE_TIMEOUT_CONNECT_HEATER,
+    ERROR_MSG_TEMPLATE_UNEXPECTED_CONNECT_HEATER,
+    ERROR_MSG_TEMPLATE_TIMEOUT_WTD_RST,
+    ERROR_MSG_TEMPLATE_PARSE_HEADER_RESET_WATCHDOGS,
+    ERROR_MSG_TEMPLATE_UNEXPECTED_RESET_WATCHDOGS,
+    ERROR_MSG_TEMPLATE_REMOTE_HEATER_DETAIL,
+    ERROR_MSG_TEMPLATE_INFO_SYSTEM_RESET_TIMEOUT,
+    ERROR_MSG_TEMPLATE_INFO_REBOOT_USER_COMMAND,
+    ERROR_MSG_TEMPLATE_INFO_REBOOT_RESET_DISABLE_FALLBACK,
+    ERROR_MSG_TEMPLATE_INFO_REBOOT_RESET_ENABLE_FALLBACK,
+    ERROR_MSG_TEMPLATE_INFO_REBOOT_BUTTON_LONG_PRESS,
+    ERROR_MSG_TEMPLATE_COUNT
+} ErrorMessageTemplate;
+
 typedef struct
 {
-    bool activeError;
-    ErrorCode errorCode;
-    char message[ERROR_MESSAGE_SIZE];
+    uint16_t magic;
+    uint16_t layoutVersion;
+    uint32_t buildId;
+} EEPROMErrorHeader;
+
+typedef struct
+{
+    uint8_t activeError;
+    uint8_t errorCode;
+    uint8_t messageTemplate;
+    uint16_t line;
+    float value;
+    char file[EEPROM_ERROR_FILE_SIZE];
 } EEPROMError;
 
-// Pin Definitions
-constexpr uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
-constexpr uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
-constexpr uint8_t VALVE_RELAY_PIN = 2;
-constexpr uint8_t RED_LED_PIN = 11;
-constexpr uint8_t GREEN_LED_PIN = 9;
-constexpr uint8_t BLUE_LED_PIN = 10;
-constexpr uint8_t BUTTON_PIN = 8;
-constexpr uint8_t HEARTBEAT_PIN = 13;
-constexpr uint8_t PRESSURE_SENSOR = A0;
-constexpr uint8_t TEMP_SENSOR = 12;
+constexpr int EEPROM_ERROR_HEADER_ADDRESS = EEPROM_ERROR_START_ADDRESS;
+constexpr int EEPROM_ERROR_ENTRIES_START_ADDRESS = EEPROM_ERROR_HEADER_ADDRESS + static_cast<int>(sizeof(EEPROMErrorHeader));
+constexpr int EEPROM_ERROR_MEMORY_ITEMS = (PROFILER_DATA_START_ADDRESS - EEPROM_ERROR_ENTRIES_START_ADDRESS) / static_cast<int>(sizeof(EEPROMError));
+
+static_assert(ENUM_LEN <= 0xFF, "ErrorCode must fit in uint8_t");
+static_assert(EEPROM_ERROR_MEMORY_ITEMS > 0, "Not enough EEPROM space for error entries");
 
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED
@@ -147,28 +193,6 @@ constexpr char setPumpTimeoutCMD[] = "SPT";
     }
 }
 
-inline const char* getErrorName(ErrorCode error)
-{
-    switch(error)
-    {
-        case NO_ERROR:
-            return "NO_ERROR";
-        case ERROR_TEMP_SENSOR_INVALID_VALUE:
-            return "ERROR_TEMP_SENSOR_INVALID_VALUE";
-        case ERROR_PRESSURE_SENSOR_INVALID_VALUE:
-            return "ERROR_PRESSURE_SENSOR_INVALID_VALUE";
-        case ERROR_COMMS_CONNECTION_NOT_ESTABLISHED:
-            return "ERROR_COMMS_CONNECTION_NOT_ESTABLISHED";
-        case ERROR_COMMS_NO_RESPONSE:
-            return "ERROR_COMMS_NO_RESPONSE";
-        case ERROR_COMMS_UNEXPECTED_MESSAGE:
-            return "ERROR_COMMS_UNEXPECTED_MESSAGE";
-        case ERROR_HEATER_MCU_ERROR:
-            return "ERROR_HEATER_MCU_ERROR";
-        default:
-            return "Unknown Error";
-    }
-}
 
 #if PROFILER_ENABLED
 extern unsigned long profilerMillis;

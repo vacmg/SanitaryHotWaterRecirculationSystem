@@ -4,29 +4,290 @@
 #include "Leds.h"
 #include "Utils.h"
 #include "FSM.h"
+#include <avr/pgmspace.h>
+#include <math.h>
+#include <string.h>
+
+enum ErrorMessageRenderMode : uint8_t
+{
+    ERROR_MESSAGE_RENDER_FLASH_STRING = 0,
+    ERROR_MESSAGE_RENDER_INT_VALUE,
+    ERROR_MESSAGE_RENDER_PRESSURE_RANGE
+};
+
+static constexpr char errorNameNoError[] PROGMEM = "NO_ERROR";
+static constexpr char errorNameTempSensorInvalidValue[] PROGMEM = "ERROR_TEMP_SENSOR_INVALID_VALUE";
+static constexpr char errorNamePressureSensorInvalidValue[] PROGMEM = "ERROR_PRESSURE_SENSOR_INVALID_VALUE";
+static constexpr char errorNameCommsConnectionNotEstablished[] PROGMEM = "ERROR_COMMS_CONNECTION_NOT_ESTABLISHED";
+static constexpr char errorNameCommsNoResponse[] PROGMEM = "ERROR_COMMS_NO_RESPONSE";
+static constexpr char errorNameCommsUnexpectedMessage[] PROGMEM = "ERROR_COMMS_UNEXPECTED_MESSAGE";
+static constexpr char errorNameHeaterMcuError[] PROGMEM = "ERROR_HEATER_MCU_ERROR";
+static constexpr char errorNameUnknown[] PROGMEM = "Unknown Error";
+
+static const char* const errorNameTable[] PROGMEM = {
+    errorNameNoError,
+    errorNameTempSensorInvalidValue,
+    errorNamePressureSensorInvalidValue,
+    errorNameCommsConnectionNotEstablished,
+    errorNameCommsNoResponse,
+    errorNameCommsUnexpectedMessage,
+    errorNameHeaterMcuError
+};
+
+static constexpr char errorMsgTemplateNone[] PROGMEM = "No persisted detail";
+static constexpr char errorMsgTemplateValveTempTooLow[] PROGMEM = "VALVE TEMP IS TOO LOW (%d)";
+static constexpr char errorMsgTemplateValveTempTooHigh[] PROGMEM = "VALVE TEMP IS TOO HIGH (%d)";
+static constexpr char errorMsgTemplateHeaterTempTooLow[] PROGMEM = "HEATER TEMP IS TOO LOW (%d)";
+static constexpr char errorMsgTemplateHeaterTempTooHigh[] PROGMEM = "HEATER TEMP IS TOO HIGH (%d)";
+static constexpr char errorMsgTemplatePressureCurrentOutsideRange[] PROGMEM = "PRESSURE CURRENT (%dmA) IS OUTSIDE THE RANGE (%d, %d)mA";
+static constexpr char errorMsgTemplateTimeoutSetPump[] PROGMEM = "Timeout receiving setPump response";
+static constexpr char errorMsgTemplateParseHeaderSetPump[] PROGMEM = "Unable to parse message header in setPump";
+static constexpr char errorMsgTemplateUnexpectedSetPump[] PROGMEM = "Unexpected response from the HEATER MCU at setPump: <not persisted>";
+static constexpr char errorMsgTemplateTimeoutSetPumpTimeout[] PROGMEM = "Timeout receiving setPumpTimeout response";
+static constexpr char errorMsgTemplateParseHeaderSetPumpTimeout[] PROGMEM = "Unable to parse message header in setPumpTimeout";
+static constexpr char errorMsgTemplateUnexpectedSetPumpTimeout[] PROGMEM = "Unexpected response from the HEATER MCU at setPumpTimeout: <not persisted>";
+static constexpr char errorMsgTemplateTimeoutGetTemp[] PROGMEM = "Timeout receiving getTemp response";
+static constexpr char errorMsgTemplateParseHeaderGetTemp[] PROGMEM = "Unable to parse message header in getTemp";
+static constexpr char errorMsgTemplateUnexpectedGetHeaterTemp[] PROGMEM = "Unexpected response from the HEATER MCU at getHeaterTemp: <not persisted>";
+static constexpr char errorMsgTemplateNoHeaterTempValue[] PROGMEM = "No temperature value received from the HEATER MCU";
+static constexpr char errorMsgTemplateTimeoutConnectHeater[] PROGMEM = "Timeout connecting to the HEATER MCU";
+static constexpr char errorMsgTemplateUnexpectedConnectHeater[] PROGMEM = "Unexpected response from the HEATER MCU at connectToHeater: <not persisted>";
+static constexpr char errorMsgTemplateTimeoutWtdRst[] PROGMEM = "Timeout receiving WTD-RST response";
+static constexpr char errorMsgTemplateParseHeaderResetWatchdogs[] PROGMEM = "Unable to parse message header in resetWatchdogs";
+static constexpr char errorMsgTemplateUnexpectedResetWatchdogs[] PROGMEM = "Unexpected response from the HEATER MCU at resetWatchdogs: <not persisted>";
+static constexpr char errorMsgTemplateRemoteHeaterDetail[] PROGMEM = "HEATER MCU returned an error detail: <not persisted>";
+static constexpr char errorMsgTemplateInfoSystemResetTimeout[] PROGMEM = "INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout";
+static constexpr char errorMsgTemplateInfoRebootUserCommand[] PROGMEM = "Rebooting by user command";
+static constexpr char errorMsgTemplateInfoRebootResetDisableFallback[] PROGMEM = "Rebooting to complete reset and disable fallback mode";
+static constexpr char errorMsgTemplateInfoRebootResetEnableFallback[] PROGMEM = "Rebooting to complete reset and enable fallback mode";
+static constexpr char errorMsgTemplateInfoRebootButtonLongPress[] PROGMEM = "Rebooting by user command (button long press)";
+
+static const char* const errorMessageTemplateTable[] PROGMEM = {
+    errorMsgTemplateNone,
+    errorMsgTemplateValveTempTooLow,
+    errorMsgTemplateValveTempTooHigh,
+    errorMsgTemplateHeaterTempTooLow,
+    errorMsgTemplateHeaterTempTooHigh,
+    errorMsgTemplatePressureCurrentOutsideRange,
+    errorMsgTemplateTimeoutSetPump,
+    errorMsgTemplateParseHeaderSetPump,
+    errorMsgTemplateUnexpectedSetPump,
+    errorMsgTemplateTimeoutSetPumpTimeout,
+    errorMsgTemplateParseHeaderSetPumpTimeout,
+    errorMsgTemplateUnexpectedSetPumpTimeout,
+    errorMsgTemplateTimeoutGetTemp,
+    errorMsgTemplateParseHeaderGetTemp,
+    errorMsgTemplateUnexpectedGetHeaterTemp,
+    errorMsgTemplateNoHeaterTempValue,
+    errorMsgTemplateTimeoutConnectHeater,
+    errorMsgTemplateUnexpectedConnectHeater,
+    errorMsgTemplateTimeoutWtdRst,
+    errorMsgTemplateParseHeaderResetWatchdogs,
+    errorMsgTemplateUnexpectedResetWatchdogs,
+    errorMsgTemplateRemoteHeaterDetail,
+    errorMsgTemplateInfoSystemResetTimeout,
+    errorMsgTemplateInfoRebootUserCommand,
+    errorMsgTemplateInfoRebootResetDisableFallback,
+    errorMsgTemplateInfoRebootResetEnableFallback,
+    errorMsgTemplateInfoRebootButtonLongPress
+};
+
+static const uint8_t errorMessageRenderModeTable[] PROGMEM = {
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_INT_VALUE,
+    ERROR_MESSAGE_RENDER_INT_VALUE,
+    ERROR_MESSAGE_RENDER_INT_VALUE,
+    ERROR_MESSAGE_RENDER_INT_VALUE,
+    ERROR_MESSAGE_RENDER_PRESSURE_RANGE,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING,
+    ERROR_MESSAGE_RENDER_FLASH_STRING
+};
+
+static_assert((sizeof(errorMessageTemplateTable) / sizeof(errorMessageTemplateTable[0])) == ERROR_MSG_TEMPLATE_COUNT, "errorMessageTemplateTable must match ErrorMessageTemplate enum");
+static_assert((sizeof(errorMessageRenderModeTable) / sizeof(errorMessageRenderModeTable[0])) == ERROR_MSG_TEMPLATE_COUNT, "errorMessageRenderModeTable must match ErrorMessageTemplate enum");
+static_assert((sizeof(errorNameTable) / sizeof(errorNameTable[0])) == ENUM_LEN, "errorNameTable must match ErrorCode enum");
+
+static int errorAddressForIndex(const uint8_t i)
+{
+    return EEPROM_ERROR_ENTRIES_START_ADDRESS + i * static_cast<int>(sizeof(EEPROMError));
+}
+
+static EEPROMError getEmptyErrorRecord()
+{
+    EEPROMError err = {0, static_cast<uint8_t>(NO_ERROR), static_cast<uint8_t>(ERROR_MSG_TEMPLATE_NONE), 0, NAN, ""};
+    return err;
+}
+
+static ErrorMessageTemplate normalizeMessageTemplate(ErrorMessageTemplate messageTemplate)
+{
+    const uint8_t index = static_cast<uint8_t>(messageTemplate);
+    if(index >= ERROR_MSG_TEMPLATE_COUNT)
+    {
+        return ERROR_MSG_TEMPLATE_NONE;
+    }
+    return messageTemplate;
+}
+
+static PGM_P getMessageTemplateFormat(ErrorMessageTemplate messageTemplate)
+{
+    const ErrorMessageTemplate normalizedTemplate = normalizeMessageTemplate(messageTemplate);
+    return static_cast<PGM_P>(pgm_read_ptr(&errorMessageTemplateTable[static_cast<uint8_t>(normalizedTemplate)]));
+}
+
+static ErrorMessageRenderMode getMessageRenderMode(ErrorMessageTemplate messageTemplate)
+{
+    const ErrorMessageTemplate normalizedTemplate = normalizeMessageTemplate(messageTemplate);
+    return static_cast<ErrorMessageRenderMode>(pgm_read_byte(&errorMessageRenderModeTable[static_cast<uint8_t>(normalizedTemplate)]));
+}
+
+static PGM_P getErrorNameText(ErrorCode error)
+{
+    const uint8_t index = static_cast<uint8_t>(error);
+    if(index >= ENUM_LEN)
+    {
+        return errorNameUnknown;
+    }
+
+    return static_cast<PGM_P>(pgm_read_ptr(&errorNameTable[index]));
+}
+
+static void printErrorName(ErrorCode error)
+{
+    Serial.print(reinterpret_cast<const __FlashStringHelper*>(getErrorNameText(error)));
+}
+
+static void copyFileBasename(char* dest, const char* file)
+{
+    const char* basename = file;
+    const char* slash = strrchr(file, '/');
+    if(slash != nullptr)
+    {
+        basename = slash + 1;
+    }
+
+    strncpy(dest, basename, EEPROM_ERROR_FILE_SIZE - 1);
+    dest[EEPROM_ERROR_FILE_SIZE - 1] = '\0';
+}
+
+static void initializeErrorStorageIfNecessary()
+{
+    EEPROMErrorHeader header;
+    EEPROM.get(EEPROM_ERROR_HEADER_ADDRESS, header);
+
+    const bool invalidHeader =
+        header.magic != EEPROM_ERROR_HEADER_MAGIC ||
+        header.layoutVersion != EEPROM_ERROR_LAYOUT_VERSION ||
+        header.buildId != EEPROM_BUILD_ID;
+
+    if(!invalidHeader)
+    {
+        return;
+    }
+
+    EEPROMError empty = getEmptyErrorRecord();
+    for(uint8_t i = 0; i < EEPROM_ERROR_MEMORY_ITEMS; i++)
+    {
+        EEPROM.put(errorAddressForIndex(i), empty);
+    }
+
+    EEPROMErrorHeader newHeader = {EEPROM_ERROR_HEADER_MAGIC, EEPROM_ERROR_LAYOUT_VERSION, EEPROM_BUILD_ID};
+    EEPROM.put(EEPROM_ERROR_HEADER_ADDRESS, newHeader);
+}
+
+
+static void printReconstructedMessage(ErrorMessageTemplate messageTemplate, float value)
+{
+    const ErrorMessageTemplate normalizedTemplate = normalizeMessageTemplate(messageTemplate);
+    PGM_P format = getMessageTemplateFormat(normalizedTemplate);
+    const ErrorMessageRenderMode renderMode = getMessageRenderMode(normalizedTemplate);
+
+    switch(renderMode)
+    {
+        case ERROR_MESSAGE_RENDER_INT_VALUE:
+        {
+            char buffer[ERROR_MESSAGE_SIZE];
+            snprintf_P(buffer, sizeof(buffer), format, static_cast<int>(value));
+            Serial.print(buffer);
+            break;
+        }
+        case ERROR_MESSAGE_RENDER_PRESSURE_RANGE:
+        {
+            char buffer[ERROR_MESSAGE_SIZE];
+            snprintf_P(
+                buffer,
+                sizeof(buffer),
+                format,
+                static_cast<int>(value),
+                static_cast<int>(MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA),
+                static_cast<int>(MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA)
+            );
+            Serial.print(buffer);
+            break;
+        }
+        case ERROR_MESSAGE_RENDER_FLASH_STRING:
+        default:
+            Serial.print(reinterpret_cast<const __FlashStringHelper*>(format));
+            break;
+    }
+}
+
+static void printReconstructedMessage(const EEPROMError& eepromError)
+{
+    printReconstructedMessage(static_cast<ErrorMessageTemplate>(eepromError.messageTemplate), eepromError.value);
+}
 
 void invalidateErrorData()
 {
-    EEPROMError eepromError;
+    initializeErrorStorageIfNecessary();
+    EEPROMError eepromError = getEmptyErrorRecord();
     for(uint8_t i = 0; i < EEPROM_ERROR_MEMORY_ITEMS; i++)
     {
-        EEPROM.get(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
-        eepromError.activeError = false;
-        EEPROM.put(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
+        EEPROM.put(errorAddressForIndex(i), eepromError);
     }
 }
 
 void printErrorData()
 {
+    initializeErrorStorageIfNecessary();
+
     EEPROMError eepromError;
     bool anyError = false;
     for(uint8_t i = 0; i < EEPROM_ERROR_MEMORY_ITEMS; i++)
     {
-        EEPROM.get(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
+        EEPROM.get(errorAddressForIndex(i), eepromError);
         if(eepromError.activeError)
         {
             anyError = true;
-            Serial.print(F("Error: ")); Serial.print(getErrorName(eepromError.errorCode)); Serial.print(F(" - ")); Serial.println(eepromError.message);
+            Serial.print(F("["));
+            Serial.print(i);
+            Serial.print(F("] Error: "));
+            printErrorName(static_cast<ErrorCode>(eepromError.errorCode));
+            Serial.print(F(" @ "));
+            Serial.print(eepromError.file);
+            Serial.print(F(":"));
+            Serial.print(eepromError.line);
+            Serial.print(F(" - "));
+            printReconstructedMessage(eepromError);
+            Serial.println();
         }
     }
 
@@ -66,14 +327,20 @@ void toggleFallbackMode(bool enableFallBackMode)
     }
 }
 
-[[noreturn]] void raiseError(ErrorCode error, const char* message)
+[[noreturn]] void raiseErrorImpl(ErrorCode error, ErrorMessageTemplate messageTemplate, float value, const char* file, uint16_t line)
 {
+    initializeErrorStorageIfNecessary();
+
     #if !DISABLE_WATCHDOGS
         wdt_reset();
     #endif
     Serial.println(F("\n-----------------------------------------"));
     Serial.println(F("-----------------------------------------"));
-    Serial.print(F("ERROR RAISED: ")); Serial.print(getErrorName(error)); if(message != nullptr) {Serial.print(F(": ")); Serial.print(message);} else {Serial.print(F("No aditional information provided"));} Serial.println();
+    Serial.print(F("ERROR RAISED: "));
+    printErrorName(error);
+    Serial.print(F(": "));
+    printReconstructedMessage(messageTemplate, value);
+    Serial.println();
     Serial.println(F("-----------------------------------------"));
     Serial.println(F("-----------------------------------------\n"));
 
@@ -86,21 +353,17 @@ void toggleFallbackMode(bool enableFallBackMode)
         for(uint8_t i = 0; !errorSaved && i < EEPROM_ERROR_MEMORY_ITEMS; i++)
         {
             EEPROMError eepromError;
-            EEPROM.get(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
+            EEPROM.get(errorAddressForIndex(i), eepromError);
 
             if(!eepromError.activeError)
             {
-                eepromError.activeError = true;
-                eepromError.errorCode = error;
-                if(message != nullptr)
-                {
-                    strncpy(eepromError.message, message, ERROR_MESSAGE_SIZE);
-                }
-                else
-                {
-                    strncpy_P(eepromError.message, PSTR("No message provided"), ERROR_MESSAGE_SIZE);
-                }
-                EEPROM.put(EEPROM_ERROR_START_ADDRESS + i*sizeof(EEPROMError), eepromError);
+                eepromError.activeError = 1;
+                eepromError.errorCode = static_cast<uint8_t>(error);
+                eepromError.messageTemplate = static_cast<uint8_t>(messageTemplate);
+                eepromError.line = line;
+                eepromError.value = value;
+                copyFileBasename(eepromError.file, file);
+                EEPROM.put(errorAddressForIndex(i), eepromError);
                 errorSaved = true;
             }
         }
@@ -117,23 +380,15 @@ void toggleFallbackMode(bool enableFallBackMode)
     rebootLoop();
 }
 
-[[noreturn]] void raiseError(ErrorCode error, const __FlashStringHelper* message)
-{
-    char buff[ERROR_MESSAGE_SIZE];
-
-    strncpy_F(buff,message,ERROR_MESSAGE_SIZE);
-
-    raiseError(error, buff);
-}
-
 void handleHeaterError(int retryCount, char* buff)
 {
     if(retryCount>=COMMS_MAX_RETRIES)
     {
         if(buff != nullptr && comms.getNextArgument(buff, SC_MAX_MESSAGE_SIZE) > 0)
         {
-            raiseError(ERROR_HEATER_MCU_ERROR, buff);
+            Serial.print(F("HEATER MCU detail before reboot: "));
+            Serial.println(buff);
         }
-        raiseError(ERROR_HEATER_MCU_ERROR);
+        raiseErrorWithTemplate(ERROR_HEATER_MCU_ERROR, ERROR_MSG_TEMPLATE_REMOTE_HEATER_DETAIL);
     }
 }
