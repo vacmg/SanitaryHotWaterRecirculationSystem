@@ -43,6 +43,17 @@ typedef struct
     char message[ERROR_MESSAGE_SIZE];
 } EEPROMError;
 
+// Pin Definitions
+constexpr uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
+constexpr uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor
+constexpr uint8_t VALVE_RELAY_PIN = 2;
+constexpr uint8_t RED_LED_PIN = 11;
+constexpr uint8_t GREEN_LED_PIN = 9;
+constexpr uint8_t BLUE_LED_PIN = 10;
+constexpr uint8_t BUTTON_PIN = 8;
+constexpr uint8_t HEARTBEAT_PIN = 13;
+constexpr uint8_t PRESSURE_SENSOR = A0;
+constexpr uint8_t TEMP_SENSOR = 12;
 
 #define RELAY_ENABLED 1
 #define RELAY_DISABLED !RELAY_ENABLED
@@ -107,7 +118,7 @@ constexpr int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 400;
 constexpr int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 400;
 
 // Command structure: "{HEADER}{CMD$}[ARG$]*"
-char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages.
+constexpr char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages.
 constexpr char pumpCMD[] = "PUMP";
 constexpr char tempCMD[] = "TMP";
 constexpr char OKCMD[] = "OK";
@@ -136,7 +147,7 @@ constexpr char setPumpTimeoutCMD[] = "SPT";
     }
 }
 
-const char* getErrorName(ErrorCode error)
+inline const char* getErrorName(ErrorCode error)
 {
     switch(error)
     {
@@ -160,7 +171,7 @@ const char* getErrorName(ErrorCode error)
 }
 
 #if PROFILER_ENABLED
-unsigned long profilerMillis = 0;
+extern unsigned long profilerMillis;
 
 typedef struct
 {
@@ -171,15 +182,15 @@ typedef struct
     char maxTimeData[PROFILER_DATA_MSG_SIZE];
 } ProfilerData;
 
-constexpr ProfilerData defaultProfilerData = {0XABDCEF12, INT32_MAX, 0, "", ""};
-ProfilerData profilerData = defaultProfilerData;
+extern const ProfilerData defaultProfilerData;
+extern ProfilerData profilerData;
 
 inline void profilerStartMeasure()
 {
     profilerMillis = millis();
 }
 
-int profilerEndMeasure()
+inline int profilerEndMeasure()
 {
     profilerMillis = millis() - profilerMillis;
     int updated = 0;
@@ -216,7 +227,7 @@ inline void loadProfilerData()
     }
 }
 
-void printProfilerData()
+inline void printProfilerData()
 {
     Serial.println("Profiler Data:");
     Serial.print("Min Time: ");
