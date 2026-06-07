@@ -299,20 +299,16 @@ void resetRaiseErrorCounter()
 
 void resetRaiseErrorCounterIfTimeoutElapsed()
 {
-    if(millis() <= FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS)
-    {
-        return;
-    }
-
-    const uint16_t currentCounter = getRaiseErrorCounter();
-    if(currentCounter == 0)
+    static bool alreadyReset = false;
+    if(alreadyReset || millis() <= FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS)
     {
         return;
     }
 
     Serial.print(F("Resetting raiseError counter after timeout. Previous value: "));
-    Serial.println(currentCounter);
+    Serial.println(getRaiseErrorCounter());
     resetRaiseErrorCounter();
+    alreadyReset = true;
 }
 
 void printErrorData()
@@ -329,7 +325,7 @@ void printErrorData()
             anyError = true;
             Serial.print(F("["));
             Serial.print(i);
-            Serial.print(F("] Error: "));
+            Serial.print(F("] "));
             printErrorName(static_cast<ErrorCode>(eepromError.errorCode));
             Serial.print(F(" @ "));
             Serial.print(eepromError.file);
@@ -374,6 +370,7 @@ void toggleFallbackMode(bool enableFallBackMode)
         }
         changeMode(mode);
         EEPROM.put(EEPROM_FALLBACK_MODE_ENABLED_ADDRESS, false);
+        resetRaiseErrorCounter();
     }
 }
 
@@ -427,11 +424,11 @@ void toggleFallbackMode(bool enableFallBackMode)
 
         Serial.print(F("raiseError counter: "));
         Serial.print(raiseErrorCounter);
-        Serial.print(F(" (fallback threshold: > "));
+        Serial.print(F(" (fallback threshold: >= "));
         Serial.print(ERROR_COUNT_TO_ENABLE_FALLBACK_MODE);
         Serial.println(F(")"));
 
-        if(raiseErrorCounter > ERROR_COUNT_TO_ENABLE_FALLBACK_MODE)
+        if(raiseErrorCounter >= ERROR_COUNT_TO_ENABLE_FALLBACK_MODE)
         {
             toggleFallbackMode(true);
         }
