@@ -84,6 +84,9 @@ void printSystemInfo()
     Serial.print(F("Transient error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
     Serial.print(F("EEPROM error slot size: ")); Serial.println(sizeof(EEPROMError));
     Serial.print(F("EEPROM error slots: ")); Serial.println(EEPROM_ERROR_MEMORY_ITEMS);
+    Serial.print(F("raiseError counter: ")); Serial.println(getRaiseErrorCounter());
+    Serial.print(F("Fallback threshold (>): ")); Serial.println(ERROR_COUNT_TO_ENABLE_FALLBACK_MODE);
+    Serial.print(F("Fallback counter reset timeout (ms): ")); Serial.println(FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS);
     Serial.print(F("Comms message max length: ")); Serial.println(SC_MAX_MESSAGE_SIZE);
     Serial.print(F("Mode: ")); Serial.println(modeToString(currentMode));
     Serial.print(F("Status: ")); Serial.println(statusToString(currentStatus));
@@ -421,6 +424,8 @@ void setup()
 
 void loop()
 {
+    resetRaiseErrorCounterIfTimeoutElapsed();
+
     #if PROFILER_ENABLED
         profilerStartMeasure();
     #endif

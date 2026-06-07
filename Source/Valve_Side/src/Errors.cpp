@@ -211,6 +211,25 @@ static void initializeErrorStorageIfNecessary()
 
     EEPROMErrorHeader newHeader = {EEPROM_ERROR_HEADER_MAGIC, EEPROM_ERROR_LAYOUT_VERSION, EEPROM_BUILD_ID};
     EEPROM.put(EEPROM_ERROR_HEADER_ADDRESS, newHeader);
+    EEPROM.put(EEPROM_ERROR_COUNTER_ADDRESS, static_cast<uint16_t>(0));
+}
+
+static uint16_t readRaiseErrorCounterFromEeprom()
+{
+    uint16_t counter = 0;
+    EEPROM.get(EEPROM_ERROR_COUNTER_ADDRESS, counter);
+    return counter;
+}
+
+static uint16_t incrementRaiseErrorCounterInEeprom()
+{
+    uint16_t counter = readRaiseErrorCounterFromEeprom();
+    if(counter < UINT16_MAX)
+    {
+        counter++;
+    }
+    EEPROM.put(EEPROM_ERROR_COUNTER_ADDRESS, counter);
+    return counter;
 }
 
 
@@ -263,6 +282,37 @@ void invalidateErrorData()
     {
         EEPROM.put(errorAddressForIndex(i), eepromError);
     }
+    EEPROM.put(EEPROM_ERROR_COUNTER_ADDRESS, static_cast<uint16_t>(0));
+}
+
+uint16_t getRaiseErrorCounter()
+{
+    initializeErrorStorageIfNecessary();
+    return readRaiseErrorCounterFromEeprom();
+}
+
+void resetRaiseErrorCounter()
+{
+    initializeErrorStorageIfNecessary();
+    EEPROM.put(EEPROM_ERROR_COUNTER_ADDRESS, static_cast<uint16_t>(0));
+}
+
+void resetRaiseErrorCounterIfTimeoutElapsed()
+{
+    if(millis() <= FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS)
+    {
+        return;
+    }
+
+    const uint16_t currentCounter = getRaiseErrorCounter();
+    if(currentCounter == 0)
+    {
+        return;
+    }
+
+    Serial.print(F("Resetting raiseError counter after timeout. Previous value: "));
+    Serial.println(currentCounter);
+    resetRaiseErrorCounter();
 }
 
 void printErrorData()
@@ -346,9 +396,11 @@ void toggleFallbackMode(bool enableFallBackMode)
 
     writeColor(ERROR_FALLBACK_COLOR);
 
-    #if !EEPROM_DONT_WRITE_ERRORS
     if(error != NO_ERROR)
     {
+        const uint16_t raiseErrorCounter = incrementRaiseErrorCounterInEeprom();
+
+        #if !EEPROM_DONT_WRITE_ERRORS
         bool errorSaved = false;
         for(uint8_t i = 0; !errorSaved && i < EEPROM_ERROR_MEMORY_ITEMS; i++)
         {
@@ -371,10 +423,19 @@ void toggleFallbackMode(bool enableFallBackMode)
         {
             Serial.println(F("ERROR: Error memory is full"));
         }
+        #endif
 
-        toggleFallbackMode(true);
+        Serial.print(F("raiseError counter: "));
+        Serial.print(raiseErrorCounter);
+        Serial.print(F(" (fallback threshold: > "));
+        Serial.print(ERROR_COUNT_TO_ENABLE_FALLBACK_MODE);
+        Serial.println(F(")"));
+
+        if(raiseErrorCounter > ERROR_COUNT_TO_ENABLE_FALLBACK_MODE)
+        {
+            toggleFallbackMode(true);
+        }
     }
-    #endif
 
     Serial.println(F("Rebooting..."));
     rebootLoop();

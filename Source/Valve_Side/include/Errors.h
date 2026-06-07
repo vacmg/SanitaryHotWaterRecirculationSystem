@@ -7,6 +7,9 @@
 
 void invalidateErrorData();
 void printErrorData();
+uint16_t getRaiseErrorCounter();
+void resetRaiseErrorCounter();
+void resetRaiseErrorCounterIfTimeoutElapsed();
 void toggleFallbackMode(bool enableFallBackMode);
 [[noreturn]] void raiseErrorImpl(ErrorCode error, ErrorMessageTemplate messageTemplate, float value, const char* file, uint16_t line);
 void handleHeaterError(int retryCount, char* buff = nullptr);
