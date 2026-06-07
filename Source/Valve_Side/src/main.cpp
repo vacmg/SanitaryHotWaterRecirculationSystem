@@ -77,20 +77,123 @@ void checkResetTime();
 void printSystemInfo()
 {
     char buff[64];
-    Serial.print(F("Remaining time until next restart: ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - static_cast<long>(millis()), buff));
-    Serial.print(F("Watchdogs reset period: ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
-    Serial.print(F("FallBack Mode ")); Serial.println(currentMode==ErrorFallBackMode?"Enabled":"Disabled");
-    Serial.print(F("Comms max retries: ")); Serial.println(COMMS_MAX_RETRIES);
-    Serial.print(F("Transient error message max length: ")); Serial.println(ERROR_MESSAGE_SIZE);
-    Serial.print(F("EEPROM error slot size: ")); Serial.println(sizeof(EEPROMError));
-    Serial.print(F("EEPROM error slots: ")); Serial.println(EEPROM_ERROR_MEMORY_ITEMS);
-    Serial.print(F("raiseError counter: ")); Serial.println(getRaiseErrorCounter());
-    Serial.print(F("Fallback threshold (>): ")); Serial.println(ERROR_COUNT_TO_ENABLE_FALLBACK_MODE);
-    Serial.print(F("Fallback counter reset timeout (ms): ")); Serial.println(FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS);
-    Serial.print(F("Comms message max length: ")); Serial.println(SC_MAX_MESSAGE_SIZE);
-    Serial.print(F("Mode: ")); Serial.println(modeToString(currentMode));
-    Serial.print(F("Status: ")); Serial.println(statusToString(currentStatus));
-    Serial.print(F("Hot Start: ")); Serial.println(hotStart?F("ACTIVE"):F("INACTIVE"));
+
+    // --- Runtime state ---
+    Serial.println(F("[ Runtime State ]"));
+    Serial.print(F("  Version:                       ")); Serial.println(F(VS));
+    Serial.print(F("  Build ID:                      ")); Serial.println(static_cast<unsigned long>(EEPROM_BUILD_ID));
+    Serial.print(F("  Mode:                          ")); Serial.println(modeToString(currentMode));
+    Serial.print(F("  Status:                        ")); Serial.println(statusToString(currentStatus));
+    Serial.print(F("  FallBack Mode:                 ")); Serial.println(currentMode == ErrorFallBackMode ? F("Enabled") : F("Disabled"));
+    Serial.print(F("  Hot Start:                     ")); Serial.println(hotStart ? F("ACTIVE") : F("INACTIVE"));
+    Serial.print(F("  Uptime:                        ")); Serial.println(formattedTime(millis(), buff));
+    Serial.print(F("  Time until next restart:       ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD - static_cast<long>(millis()), buff));
+
+    // --- Feature flags ---
+    Serial.println(F("[ Feature Flags ]"));
+    Serial.print(F("  DEBUG:                         ")); Serial.println(DEBUG);
+    Serial.print(F("  DEBUGWATCHDOG:                 ")); Serial.println(DEBUGWATCHDOG);
+    Serial.print(F("  DEBUGTEMP:                     ")); Serial.println(DEBUGTEMP);
+    Serial.print(F("  DEBUGCONNECT:                  ")); Serial.println(DEBUGCONNECT);
+    Serial.print(F("  PROFILER_ENABLED:              ")); Serial.println(PROFILER_ENABLED);
+    Serial.print(F("  ENABLE_HEARTBEAT:              ")); Serial.println(ENABLE_HEARTBEAT);
+    Serial.print(F("  DISABLE_WATCHDOGS:             ")); Serial.println(DISABLE_WATCHDOGS);
+    Serial.print(F("  MOCK_SENSORS:                  ")); Serial.println(MOCK_SENSORS);
+    Serial.print(F("  SC_USE_HAMMING_7_4:            ")); Serial.println(SC_USE_HAMMING_7_4_CORRECTION_CODE);
+    Serial.print(F("  ENABLE_AUTO_RESTART:           ")); Serial.println(ENABLE_AUTO_RESTART);
+    Serial.print(F("  EEPROM_DONT_WRITE_ERRORS:      ")); Serial.println(EEPROM_DONT_WRITE_ERRORS);
+
+    // --- EEPROM layout ---
+    Serial.println(F("[ EEPROM Layout ]"));
+    Serial.print(F("  EEPROM_MODE_ADDRESS:           ")); Serial.println(EEPROM_MODE_ADDRESS);
+    Serial.print(F("  EEPROM_FALLBACK_ADDR:          ")); Serial.println(EEPROM_FALLBACK_MODE_ENABLED_ADDRESS);
+    Serial.print(F("  EEPROM_ERROR_COUNTER_ADDR:     ")); Serial.println(EEPROM_ERROR_COUNTER_ADDRESS);
+    Serial.print(F("  EEPROM_ERROR_START_ADDR:       ")); Serial.println(EEPROM_ERROR_START_ADDRESS);
+    Serial.print(F("  EEPROM_ERROR_HEADER_ADDR:      ")); Serial.println(EEPROM_ERROR_HEADER_ADDRESS);
+    Serial.print(F("  EEPROM_ERROR_ENTRIES_ADDR:     ")); Serial.println(EEPROM_ERROR_ENTRIES_START_ADDRESS);
+    Serial.print(F("  EEPROM_ERROR_LAYOUT_VERSION:   ")); Serial.println(EEPROM_ERROR_LAYOUT_VERSION);
+    Serial.print(F("  PROFILER_DATA_START_ADDR:      ")); Serial.println(PROFILER_DATA_START_ADDRESS);
+    Serial.print(F("  Error slot size (bytes):       ")); Serial.println(sizeof(EEPROMError));
+    Serial.print(F("  Error slots:                   ")); Serial.println(EEPROM_ERROR_MEMORY_ITEMS);
+    Serial.print(F("  Error msg max length:          ")); Serial.println(ERROR_MESSAGE_SIZE);
+    Serial.print(F("  Error file field size:         ")); Serial.println(EEPROM_ERROR_FILE_SIZE);
+
+    // --- Fallback / error counter ---
+    Serial.println(F("[ Fallback / Error Counter ]"));
+    Serial.print(F("  raiseError counter:            ")); Serial.println(getRaiseErrorCounter());
+    Serial.print(F("  Fallback threshold (>):        ")); Serial.println(ERROR_COUNT_TO_ENABLE_FALLBACK_MODE);
+    Serial.print(F("  Counter reset timeout (ms):    ")); Serial.println(FALLBACK_ERROR_COUNTER_RESET_TIMEOUT_MS);
+
+    // --- Watchdog / restart ---
+    Serial.println(F("[ Watchdog / Restart ]"));
+    Serial.print(F("  Watchdog reset period (ms):    ")); Serial.println(formattedTime(WATCHDOG_RESET_PERIOD, buff));
+    Serial.print(F("  System reset period:           ")); Serial.println(formattedTime(SYSTEM_RESET_PERIOD, buff));
+
+    // --- Communications ---
+    Serial.println(F("[ Communications ]"));
+    Serial.print(F("  USB baud rate:                 ")); Serial.println(SERIAL_USB_BAUD_RATE);
+    Serial.print(F("  RS485 baud rate:               ")); Serial.println(RS485_SERIAL_BAUD_RATE);
+    Serial.print(F("  Comms header:                  ")); Serial.println(HEADER);
+    Serial.print(F("  Comms max retries:             ")); Serial.println(COMMS_MAX_RETRIES);
+    Serial.print(F("  Comms msg max length:          ")); Serial.println(SC_MAX_MESSAGE_SIZE);
+    Serial.print(F("  Received msg timeout (ms):     ")); Serial.println(RECEIVED_MESSAGE_TIMEOUT);
+    Serial.print(F("  Pump msg proc wait (ms):       ")); Serial.println(PUMP_MESSAGE_PROCESSING_WAIT_TIME);
+    Serial.print(F("  PumpTimeout msg proc wait(ms): ")); Serial.println(PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME);
+    Serial.print(F("  Temp msg proc wait (ms):       ")); Serial.println(TEMP_MESSAGE_PROCESSING_WAIT_TIME);
+    Serial.print(F("  WDT-RST msg proc wait (ms):    ")); Serial.println(WDT_RST_MESSAGE_PROCESSING_WAIT_TIME);
+    Serial.print(F("  Init connection timeout (ms):  ")); Serial.println(formattedTime(INIT_CONNECTION_TIMEOUT, buff));
+    Serial.print(F("  Auto disable pump timeout(ms): ")); Serial.println(formattedTime(AUTO_DISABLE_PUMP_TIMEOUT, buff));
+
+    // --- Temperature ---
+    Serial.println(F("[ Temperature ]"));
+    Serial.print(F("  Min allowed temp (C):          ")); Serial.println(MIN_ALLOWED_TEMP);
+    Serial.print(F("  Max allowed temp (C):          ")); Serial.println(MAX_ALLOWED_TEMP);
+    Serial.print(F("  Hot water temp multiplier:     ")); Serial.println(HOT_WATER_TEMPERATURE_MULTIPLIER);
+    Serial.print(F("  Cold water temp multiplier:    ")); Serial.println(COLD_WATER_TEMPERATURE_MULTIPLIER);
+    Serial.print(F("  Heater temp gather period(ms): ")); Serial.println(HEATER_TEMP_GATHERING_PERIOD);
+    Serial.print(F("  Valve temp gather period (ms): ")); Serial.println(VALVE_TEMP_GATHERING_PERIOD);
+    Serial.print(F("  Time before heater temp (ms):  ")); Serial.println(TIME_BEFORE_GETTING_HEATER_TEMP);
+    Serial.print(F("  Temp sensor conv time (ms):    ")); Serial.println(TEMP_SENSOR_ADDITIONAL_CONVERSION_TIME);
+
+    // --- Pressure ---
+    Serial.println(F("[ Pressure ]"));
+    Serial.print(F("  Pressure sensor min (bar):     ")); Serial.println(PRESSURE_SENSOR_MIN_BAR);
+    Serial.print(F("  Pressure sensor max (bar):     ")); Serial.println(PRESSURE_SENSOR_MAX_BAR);
+    Serial.print(F("  Water min normal press (bar):  ")); Serial.println(WATER_MIN_NORMAL_PRESSURE_BAR);
+    Serial.print(F("  Pressure current min (mA):     ")); Serial.println(PRESSURE_SENSOR_CURRENT_MIN_mA);
+    Serial.print(F("  Pressure current max (mA):     ")); Serial.println(PRESSURE_SENSOR_CURRENT_MAX_mA);
+    Serial.print(F("  Min allowed current (mA):      ")); Serial.println(MIN_ALLOWED_PRESSURE_SENSOR_CURRENT_mA);
+    Serial.print(F("  Max allowed current (mA):      ")); Serial.println(MAX_ALLOWED_PRESSURE_SENSOR_CURRENT_mA);
+
+    // --- LED / Animation ---
+    Serial.println(F("[ LED / Animation ]"));
+    Serial.print(F("  Min progress value:            ")); Serial.println(MIN_PROGRESS_VALUE);
+    Serial.print(F("  Max progress value:            ")); Serial.println(MAX_PROGRESS_VALUE);
+    Serial.print(F("  Fade min temp offset:          ")); Serial.println(FADE_MIN_TEMP_OFFSET);
+    Serial.print(F("  Fallback anim frame delay(ms): ")); Serial.println(FALLBACK_MODE_ANIMATION_FRAME_DELAY);
+    Serial.print(F("  AlwaysOn anim frame delay(ms): ")); Serial.println(ALWAYS_ACTIVE_MODE_ANIMATION_FRAME_DELAY);
+    Serial.print(F("  Fallback anim brightness step: ")); Serial.println(FALLBACK_MODE_ANIMATION_BRIGHTNESS_STEP);
+    Serial.print(F("  AlwaysOn anim brightness step: ")); Serial.println(ALWAYS_ACTIVE_MODE_ANIMATION_BRIGHTNESS_STEP);
+    Serial.print(F("  Flash driving color period(ms):")); Serial.println(FLASH_DRIVING_WATER_COLOR_PERIOD);
+    Serial.print(F("  Flash emergency period (ms):   ")); Serial.println(FLASH_EMERGENCY_SHUTDOWN_COLOR_PERIOD);
+
+    // --- Button ---
+    Serial.println(F("[ Button ]"));
+    Serial.print(F("  Long press time (ms):          ")); Serial.println(BUTTON_LONG_PRESSED_TIME);
+    Serial.print(F("  Short press min time (ms):     ")); Serial.println(BUTTON_SHORT_PRESSED_MIN_TIME);
+
+    // --- Pinout ---
+    Serial.println(F("[ Pinout ]"));
+    Serial.print(F("  RECEIVER_ENABLE_PIN:           ")); Serial.println(RECEIVER_ENABLE_PIN);
+    Serial.print(F("  DRIVE_ENABLE_PIN:              ")); Serial.println(DRIVE_ENABLE_PIN);
+    Serial.print(F("  VALVE_RELAY_PIN:               ")); Serial.println(VALVE_RELAY_PIN);
+    Serial.print(F("  RED_LED_PIN:                   ")); Serial.println(RED_LED_PIN);
+    Serial.print(F("  GREEN_LED_PIN:                 ")); Serial.println(GREEN_LED_PIN);
+    Serial.print(F("  BLUE_LED_PIN:                  ")); Serial.println(BLUE_LED_PIN);
+    Serial.print(F("  BUTTON_PIN:                    ")); Serial.println(BUTTON_PIN);
+    Serial.print(F("  HEARTBEAT_PIN:                 ")); Serial.println(HEARTBEAT_PIN);
+    Serial.print(F("  PRESSURE_SENSOR:               ")); Serial.println(PRESSURE_SENSOR);
+    Serial.print(F("  TEMP_SENSOR:                   ")); Serial.println(TEMP_SENSOR);
 }
 
 void printSensorsInfo()
