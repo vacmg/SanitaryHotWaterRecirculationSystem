@@ -11,8 +11,6 @@
 #error This sketch is only compatible with an some arduinos with avr architecture due to the watchdog timer used (8s). However, with some modifications to the timings in the program, it is possible to run it in other platforms. For more info check this: https://www.nongnu.org/avr-libc/user-manual/wdt_8h_source.html
 #endif
 
-#include <Arduino.h>
-
 #define VS "V2.0.0"
 
 #define DEBUG 1
