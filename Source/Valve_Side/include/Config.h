@@ -12,7 +12,6 @@
 #endif
 
 #include <Arduino.h>
-#include <EEPROM.h>
 
 #define VS "V2.0.0"
 
@@ -107,7 +106,7 @@ constexpr int WDT_RST_MESSAGE_PROCESSING_WAIT_TIME = 400;
 constexpr int PUMP_TIMEOUT_MESSAGE_PROCESSING_WAIT_TIME = 400;
 
 // Command structure: "{HEADER}{CMD$}[ARG$]*"
-char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages.
+constexpr char HEADER[] = "SHWRS_"; // This string is prepended to the message and used to discard leftover bytes from previous messages.
 constexpr char pumpCMD[] = "PUMP";
 constexpr char tempCMD[] = "TMP";
 constexpr char OKCMD[] = "OK";
@@ -124,125 +123,7 @@ constexpr char setPumpTimeoutCMD[] = "SPT";
 #define debugln(...)
 #endif
 
-
-[[noreturn]] inline void rebootLoop()
-{
-    wdt_enable(WDTO_8S); /* Enable the watchdog with a timeout of 8 seconds */
-
-    while (true)
-    {
-        Serial.print('.');
-        delay(500);
-    }
-}
-
-const char* getErrorName(ErrorCode error)
-{
-    switch(error)
-    {
-        case NO_ERROR:
-            return "NO_ERROR";
-        case ERROR_TEMP_SENSOR_INVALID_VALUE:
-            return "ERROR_TEMP_SENSOR_INVALID_VALUE";
-        case ERROR_PRESSURE_SENSOR_INVALID_VALUE:
-            return "ERROR_PRESSURE_SENSOR_INVALID_VALUE";
-        case ERROR_COMMS_CONNECTION_NOT_ESTABLISHED:
-            return "ERROR_COMMS_CONNECTION_NOT_ESTABLISHED";
-        case ERROR_COMMS_NO_RESPONSE:
-            return "ERROR_COMMS_NO_RESPONSE";
-        case ERROR_COMMS_UNEXPECTED_MESSAGE:
-            return "ERROR_COMMS_UNEXPECTED_MESSAGE";
-        case ERROR_HEATER_MCU_ERROR:
-            return "ERROR_HEATER_MCU_ERROR";
-        default:
-            return "Unknown Error";
-    }
-}
-
-#if PROFILER_ENABLED
-unsigned long profilerMillis = 0;
-
-typedef struct
-{
-    unsigned long valid;
-    unsigned long minTime;
-    unsigned long maxTime;
-    char minTimeData[PROFILER_DATA_MSG_SIZE];
-    char maxTimeData[PROFILER_DATA_MSG_SIZE];
-} ProfilerData;
-
-constexpr ProfilerData defaultProfilerData = {0XABDCEF12, INT32_MAX, 0, "", ""};
-ProfilerData profilerData = defaultProfilerData;
-
-inline void profilerStartMeasure()
-{
-    profilerMillis = millis();
-}
-
-int profilerEndMeasure()
-{
-    profilerMillis = millis() - profilerMillis;
-    int updated = 0;
-    if(profilerMillis < profilerData.minTime)
-    {
-        profilerData.minTime = profilerMillis;
-        updated = -1;
-    }
-    if(profilerMillis > profilerData.maxTime)
-    {
-        profilerData.maxTime = profilerMillis;
-        updated = 1;
-    }
-    return updated;
-}
-
-inline void saveProfilerData()
-{
-    EEPROM.put(PROFILER_DATA_START_ADDRESS, profilerData);
-}
-
-inline void clearProfilerData()
-{
-    profilerData = defaultProfilerData;
-    saveProfilerData();
-}
-
-inline void loadProfilerData()
-{
-    EEPROM.get(PROFILER_DATA_START_ADDRESS, profilerData);
-    if(profilerData.valid != defaultProfilerData.valid)
-    {
-        clearProfilerData();
-    }
-}
-
-void printProfilerData()
-{
-    Serial.println("Profiler Data:");
-    Serial.print("Min Time: ");
-    Serial.println(profilerData.minTime);
-    Serial.print("Max Time: ");
-    Serial.println(profilerData.maxTime);
-    Serial.print("Min Time Data: ");
-    Serial.println(profilerData.minTimeData);
-    Serial.print("Max Time Data: ");
-    Serial.println(profilerData.maxTimeData);
-    Serial.println();
-}
-
-#else
-
-inline void loadProfilerData()
-{
-    unsigned long invalid = 0;
-    EEPROM.put(PROFILER_DATA_START_ADDRESS, invalid);
-}
-
-inline void printProfilerData()
-{
-    Serial.println("Profiler is disabled.");
-}
-
-#endif
+[[noreturn]] void rebootLoop();
+const char* getErrorName(ErrorCode error);
 
 #endif
