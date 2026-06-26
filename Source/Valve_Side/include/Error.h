@@ -6,6 +6,7 @@
 #define VALVE_SIDE_ERROR_H
 
 #include "Config.h"
+#include "Arduino.h"
 
 [[noreturn]] void raiseError(ErrorCode error, const char* message = nullptr);
 [[noreturn]] void raiseError(ErrorCode error, const __FlashStringHelper* message);

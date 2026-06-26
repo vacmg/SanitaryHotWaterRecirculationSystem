@@ -6,6 +6,7 @@
 #define VALVE_SIDE_PINOUT_H
 
 #include "Config.h"
+#include "Arduino.h"
 
 constexpr uint8_t RECEIVER_ENABLE_PIN = 5;  // HIGH = Driver / LOW = Receptor
 constexpr uint8_t DRIVE_ENABLE_PIN = 4;  // HIGH = Driver / LOW = Receptor

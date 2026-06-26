@@ -3,6 +3,7 @@
 //
 
 #include "Config.h"
+#include "Arduino.h"
 
 [[noreturn]] void rebootLoop()
 {

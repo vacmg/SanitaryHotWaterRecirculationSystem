@@ -5,6 +5,7 @@
 #include "Config.h"
 #include "Profiler.h"
 #include "EEPROM.h"
+#include "Arduino.h"
 
 #if PROFILER_ENABLED
 unsigned long profilerMillis = 0;
