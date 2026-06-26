@@ -153,6 +153,10 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
+                    if(static_cast<int>(valveTemp) < progressMinTemp)
+                    {
+                        progressMinTemp = static_cast<int>(valveTemp);
+                    }
                     long progress = map(static_cast<long>(valveTemp), progressMinTemp, static_cast<long>(desiredTemp), MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
                     debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
