@@ -15,6 +15,8 @@
     #include <DallasTemperature.h>
 #endif
 
+#include "Profiler.h"
+
 
 constexpr uint8_t RECEIVER_ENABLE_PIN =  10;  // HIGH = Driver / LOW = Receptor
 constexpr uint8_t DRIVE_ENABLE_PIN =  9;  // HIGH = Driver / LOW = Receptor
