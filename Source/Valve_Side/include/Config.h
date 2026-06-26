@@ -89,6 +89,7 @@ constexpr int HEATER_TEMP_GATHERING_PERIOD = 10000; // 10 s
 constexpr int VALVE_TEMP_GATHERING_PERIOD = 3000; // 3 s
 constexpr float HOT_WATER_TEMPERATURE_MULTIPLIER = 0.72; // more than 72% of the water temperature at the heater must be on the valve to open it.
 constexpr float COLD_WATER_TEMPERATURE_MULTIPLIER = 0.85; // less than 85% of the maximum water temperature at the valve must be on the valve to close it.
+constexpr float VALVE_OPEN_CONFIDENCE_MULTIPLIER = 0.60; // fraction of heater temp at which we open the valve early (hot water confidently present); pump continues until HOT_WATER_TEMPERATURE_MULTIPLIER threshold.
 
 constexpr double PRESSURE_SENSOR_MIN_BAR = 0.0;
 constexpr double PRESSURE_SENSOR_MAX_BAR = 10.0;

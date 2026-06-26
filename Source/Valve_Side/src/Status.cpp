@@ -34,6 +34,8 @@ Color statusToColor(Status status)
         case OnPressureTrigger_TransitionToDrivingWater:
         case OnPressureTrigger_DrivingWater:
             return DRIVING_WATER_COLOR;
+        case OnPressureTrigger_ValveOpenPumpRunning:
+            return SERVING_WATER_COLOR;
         case OnPressureTrigger_ServingWater:
             return SERVING_WATER_COLOR;
         case AlwaysActive_Begin:
@@ -63,6 +65,8 @@ const char* statusToString(Status status)
             return "OnPressureTrigger_TransitionToDrivingWater";
         case OnPressureTrigger_DrivingWater:
             return "OnPressureTrigger_DrivingWater";
+        case OnPressureTrigger_ValveOpenPumpRunning:
+            return "OnPressureTrigger_ValveOpenPumpRunning";
         case OnPressureTrigger_ServingWater:
             return "OnPressureTrigger_ServingWater";
         case AlwaysActive_Begin:
@@ -157,8 +161,9 @@ void stepFSM()
                     {
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, static_cast<long>(desiredTemp), MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
-                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
+                    long confidenceTemp = static_cast<long>(lastHeaterTemp * VALVE_OPEN_CONFIDENCE_MULTIPLIER);
+                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, confidenceTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
+                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tconfidenceTemp: ")); debug(confidenceTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     writeColor(progress, 0, 255-progress);
 
@@ -166,6 +171,49 @@ void stepFSM()
                     {
                         setPump(false);
                         setValve(true);
+
+                        changeStatus(OnPressureTrigger_ServingWater);
+
+                        desiredTemp = MIN_ALLOWED_TEMP;
+                        maxTemp = MIN_ALLOWED_TEMP;
+                        progressMinTemp = static_cast<int>(valveTemp);
+                    }
+                    else if(valveTemp >= lastHeaterTemp * VALVE_OPEN_CONFIDENCE_MULTIPLIER)
+                    {
+                        setValve(true);
+                        flashDrivingWaterColorMillis = millis();
+
+                        changeStatus(OnPressureTrigger_ValveOpenPumpRunning);
+                    }
+                }
+            }
+            break;
+
+        case OnPressureTrigger_ValveOpenPumpRunning:
+            {
+                getHeaterTempIfNecessary(&lastHeaterTemp);
+                desiredTemp = getDesiredTemp(lastHeaterTemp);
+
+                if(millis() - flashDrivingWaterColorMillis > FLASH_DRIVING_WATER_COLOR_PERIOD)
+                {
+                    static bool flash = false;
+                    writeColor(flash ? SERVING_WATER_COLOR : Black);
+                    flash = (!flash);
+                    flashDrivingWaterColorMillis = millis();
+                }
+
+                if(tempRequestReady)
+                {
+                    tempRequestReady = false;
+                    if(static_cast<int>(valveTemp) < progressMinTemp)
+                    {
+                        progressMinTemp = static_cast<int>(valveTemp);
+                    }
+                    debug(statusToString(currentStatus)); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debugln(desiredTemp);
+
+                    if(valveTemp >= desiredTemp)
+                    {
+                        setPump(false);
 
                         changeStatus(OnPressureTrigger_ServingWater);
 

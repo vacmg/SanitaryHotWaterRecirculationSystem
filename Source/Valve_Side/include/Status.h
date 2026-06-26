@@ -8,7 +8,7 @@
 #include "Mode.h"
 #include "Color.h"
 
-typedef enum {ErrorFallBack_Begin, ErrorFallBack, OnPressureTrigger_Begin, OnPressureTrigger_WaitingCold, OnPressureTrigger_TransitionToDrivingWater, OnPressureTrigger_DrivingWater, OnPressureTrigger_ServingWater, AlwaysActive_Begin, AlwaysActive_TransitionToGettingHotWater, AlwaysActive_GettingHotWater, AlwaysActive_Idle} Status;
+typedef enum {ErrorFallBack_Begin, ErrorFallBack, OnPressureTrigger_Begin, OnPressureTrigger_WaitingCold, OnPressureTrigger_TransitionToDrivingWater, OnPressureTrigger_DrivingWater, OnPressureTrigger_ValveOpenPumpRunning, OnPressureTrigger_ServingWater, AlwaysActive_Begin, AlwaysActive_TransitionToGettingHotWater, AlwaysActive_GettingHotWater, AlwaysActive_Idle} Status;
 #define changeStatus(newStatus) do {debug(F("Changing Status from ")); debug(statusToString(currentStatus)); currentStatus = newStatus; writeColor(statusToColor(currentStatus)); debug(F(" to ")); debugln(statusToString(currentStatus));} while(0)
 
 #define BOOT_COLOR Green
