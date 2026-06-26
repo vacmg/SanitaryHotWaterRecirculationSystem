@@ -161,9 +161,9 @@ void stepFSM()
                     {
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
-                    long confidenceTemp = static_cast<long>(lastHeaterTemp * VALVE_OPEN_CONFIDENCE_MULTIPLIER);
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, confidenceTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
-                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tconfidenceTemp: ")); debug(confidenceTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
+                    long deltaThresholdTemp = static_cast<long>(progressMinTemp) + static_cast<long>(VALVE_OPEN_DELTA_THRESHOLD);
+                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, deltaThresholdTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
+                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdeltaThresholdTemp: ")); debug(deltaThresholdTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     writeColor(progress, 0, 255-progress);
 
@@ -178,7 +178,7 @@ void stepFSM()
                         maxTemp = MIN_ALLOWED_TEMP;
                         progressMinTemp = static_cast<int>(valveTemp);
                     }
-                    else if(valveTemp >= lastHeaterTemp * VALVE_OPEN_CONFIDENCE_MULTIPLIER)
+                    else if((valveTemp - progressMinTemp) >= VALVE_OPEN_DELTA_THRESHOLD)
                     {
                         setValve(true);
                         flashDrivingWaterColorMillis = millis();
