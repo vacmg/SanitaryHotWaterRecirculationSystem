@@ -33,7 +33,7 @@ unsigned long flashDrivingWaterColorMillis = 0;
 bool hotStart = false; // This is used to know if enough time has passed since the last time the pump was started.
 int lastHeaterTemp = 0;
 
-int progressMinTemp = 0;
+float progressMinTemp = 0;
 float desiredTemp = 0;
 float maxTemp = 0;
 

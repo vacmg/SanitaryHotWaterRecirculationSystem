@@ -39,7 +39,7 @@ extern unsigned long flashDrivingWaterColorMillis;
 extern bool hotStart; // This is used to know if enough time has passed since the last time the pump was started.
 extern int lastHeaterTemp;
 
-extern int progressMinTemp;
+extern float progressMinTemp;
 extern float desiredTemp;
 extern float maxTemp;
 

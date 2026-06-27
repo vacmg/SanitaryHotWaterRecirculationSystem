@@ -118,7 +118,7 @@ void stepFSM()
                 timeBeforeGettingHeaterTempMillis = millis();
                 flashDrivingWaterColorMillis = timeBeforeGettingHeaterTempMillis;
                 debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
-                progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
+                progressMinTemp = getValveTemp() - FADE_MIN_TEMP_OFFSET;
             }
             break;
 
@@ -157,13 +157,13 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    if(static_cast<int>(valveTemp) < progressMinTemp)
+                    if(valveTemp < progressMinTemp)
                     {
-                        progressMinTemp = static_cast<int>(valveTemp);
+                        progressMinTemp = valveTemp;
                     }
-                    long deltaThresholdTemp = static_cast<long>(progressMinTemp) + static_cast<long>(VALVE_OPEN_DELTA_THRESHOLD);
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, deltaThresholdTemp, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
-                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdeltaThresholdTemp: ")); debug(deltaThresholdTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
+                    float ratio = (valveTemp - progressMinTemp) / VALVE_OPEN_DELTA_THRESHOLD;
+                    int progress = static_cast<int>(constrain(ratio * MAX_PROGRESS_VALUE, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE));
+                    debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     writeColor(progress, 0, 255-progress);
 
@@ -176,7 +176,7 @@ void stepFSM()
 
                         desiredTemp = MIN_ALLOWED_TEMP;
                         maxTemp = MIN_ALLOWED_TEMP;
-                        progressMinTemp = static_cast<int>(valveTemp);
+                        progressMinTemp = valveTemp;
                     }
                     else if((valveTemp - progressMinTemp) >= VALVE_OPEN_DELTA_THRESHOLD)
                     {
@@ -205,9 +205,9 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    if(static_cast<int>(valveTemp) < progressMinTemp)
+                    if(valveTemp < progressMinTemp)
                     {
-                        progressMinTemp = static_cast<int>(valveTemp);
+                        progressMinTemp = valveTemp;
                     }
                     debug(statusToString(currentStatus)); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debugln(desiredTemp);
 
@@ -219,7 +219,7 @@ void stepFSM()
 
                         desiredTemp = MIN_ALLOWED_TEMP;
                         maxTemp = MIN_ALLOWED_TEMP;
-                        progressMinTemp = static_cast<int>(valveTemp);
+                        progressMinTemp = valveTemp;
                     }
                 }
             }
@@ -258,7 +258,7 @@ void stepFSM()
             changeStatus(AlwaysActive_TransitionToGettingHotWater);
             timeBeforeGettingHeaterTempMillis = millis();
             debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
-            progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
+            progressMinTemp = getValveTemp() - FADE_MIN_TEMP_OFFSET;
         break;
 
         case AlwaysActive_TransitionToGettingHotWater:
@@ -290,7 +290,8 @@ void stepFSM()
                 if(tempRequestReady)
                 {
                     tempRequestReady = false;
-                    long progress = map(static_cast<long>(valveTemp), progressMinTemp, static_cast<long>(desiredTemp), MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE);
+                    float ratio = (valveTemp - progressMinTemp) / (desiredTemp - progressMinTemp);
+                    int progress = static_cast<int>(constrain(ratio * MAX_PROGRESS_VALUE, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE));
                     debug(statusToString(currentStatus));debug(F("\tinitialTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
 
                     if(valveTemp >= desiredTemp)
@@ -302,7 +303,7 @@ void stepFSM()
 
                         desiredTemp = MIN_ALLOWED_TEMP;
                         maxTemp = MIN_ALLOWED_TEMP;
-                        progressMinTemp = static_cast<int>(valveTemp);
+                        progressMinTemp = valveTemp;
                     }
                 }
             }
@@ -328,7 +329,7 @@ void stepFSM()
                     hotStart = false;
                     timeBeforeGettingHeaterTempMillis = millis();
                     debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
-                    progressMinTemp = static_cast<int>(getValveTemp()) - FADE_MIN_TEMP_OFFSET;
+                    progressMinTemp = getValveTemp() - FADE_MIN_TEMP_OFFSET;
                 }
             }
             break;
