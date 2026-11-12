@@ -1418,10 +1418,14 @@ void setup()
 {
     wdt_disable(); /* Disable the watchdog and wait for more than 8 seconds*/
 
+    // Keep the valve open while the heater side is unavailable during startup.
+    // Preload the output latch before enabling the pin to avoid a closed pulse.
+    // The current FSM state will decide whether to close it after reconnecting.
+    setValve(true);
     pinMode(VALVE_RELAY_PIN,OUTPUT);
+
     bool fallbackModeEnabled;
     EEPROM.get(EEPROM_FALLBACK_MODE_ENABLED_ADDRESS, fallbackModeEnabled);
-    setValve(fallbackModeEnabled);
 
     pinMode(RED_LED_PIN, OUTPUT);
     pinMode(GREEN_LED_PIN, OUTPUT);
@@ -1566,6 +1570,10 @@ void setup()
     {
         connectToHeater();
     }
+
+    // Apply the initial state only after the connection attempt has completed.
+    // Normal operating modes close the valve here; fallback mode keeps it open.
+    stepFSM();
 
     Serial.println(F("System successfully started!!!"));
 
