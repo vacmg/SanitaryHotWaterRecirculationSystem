@@ -306,8 +306,9 @@ void stepFSM()
 
                 debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
 
-                if(!isTriggerActive() && valveTemp <= desiredTemp)
+                if(valveTemp <= desiredTemp)
                 {
+                    setPump(true);
                     changeStatus(AlwaysActive_TransitionToGettingHotWater);
                     timeBeforeGettingHeaterTempMillis = millis();
                     debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
