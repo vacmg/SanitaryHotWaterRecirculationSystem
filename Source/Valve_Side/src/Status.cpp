@@ -104,7 +104,6 @@ void stepFSM()
             setPump(false);
             setPumpTimeout(AUTO_DISABLE_PUMP_TIMEOUT);
             setValve(false);
-            hotStart = false;
             changeStatus(OnPressureTrigger_WaitingCold);
             break;
 
@@ -114,11 +113,11 @@ void stepFSM()
                 setPump(true);
 
                 changeStatus(OnPressureTrigger_TransitionToDrivingWater);
-                hotStart = false;
                 timeBeforeGettingHeaterTempMillis = millis();
                 flashDrivingWaterColorMillis = timeBeforeGettingHeaterTempMillis;
                 debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
-                progressMinTemp = getValveTemp() - FADE_MIN_TEMP_OFFSET;
+                valveOpenReferenceTemp = getValveTemp();
+                progressMinTemp = valveOpenReferenceTemp - FADE_MIN_TEMP_OFFSET;
             }
             break;
 
@@ -134,17 +133,7 @@ void stepFSM()
                 if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
                 {
                     heaterTempPMillis = 0;
-
                     changeStatus(OnPressureTrigger_DrivingWater);
-
-                    getHeaterTempIfNecessary(&lastHeaterTemp);
-                    if(valveTemp > getDesiredTemp(lastHeaterTemp))
-                    {
-                        debug(statusToString(currentStatus));debugln(F("\tHot start detected"));
-                        hotStart = true;
-                    }
-
-                    heaterTempPMillis = 0;
                 }
             }
             break;
@@ -161,6 +150,10 @@ void stepFSM()
                     {
                         progressMinTemp = valveTemp;
                     }
+                    if(valveTemp < valveOpenReferenceTemp)
+                    {
+                        valveOpenReferenceTemp = valveTemp;
+                    }
                     float ratio = (valveTemp - progressMinTemp) / VALVE_OPEN_DELTA_THRESHOLD;
                     int progress = static_cast<int>(constrain(ratio * MAX_PROGRESS_VALUE, MIN_PROGRESS_VALUE, MAX_PROGRESS_VALUE));
                     debug(statusToString(currentStatus));debug(F("\tfadeMinTemp: ")); debug(progressMinTemp); debug(F("\tvalveTemp: ")); debug(valveTemp); debug(F("\tdesiredTemp: ")); debug(desiredTemp); debug(F("\tProgress: ")); debug((progress*100)/MAX_PROGRESS_VALUE); debug(F("% (")); debug(progress); debugln(F(")"));
@@ -174,11 +167,11 @@ void stepFSM()
 
                         changeStatus(OnPressureTrigger_ServingWater);
 
-                        desiredTemp = MIN_ALLOWED_TEMP;
-                        maxTemp = MIN_ALLOWED_TEMP;
+                        maxTemp = valveTemp;
+                        desiredTemp = maxTemp - COOLING_DELTA_THRESHOLD;
                         progressMinTemp = valveTemp;
                     }
-                    else if((valveTemp - progressMinTemp) >= VALVE_OPEN_DELTA_THRESHOLD)
+                    else if((valveTemp - valveOpenReferenceTemp) >= VALVE_OPEN_DELTA_THRESHOLD)
                     {
                         setValve(true);
                         flashDrivingWaterColorMillis = millis();
@@ -217,8 +210,8 @@ void stepFSM()
 
                         changeStatus(OnPressureTrigger_ServingWater);
 
-                        desiredTemp = MIN_ALLOWED_TEMP;
-                        maxTemp = MIN_ALLOWED_TEMP;
+                        maxTemp = valveTemp;
+                        desiredTemp = maxTemp - COOLING_DELTA_THRESHOLD;
                         progressMinTemp = valveTemp;
                     }
                 }
@@ -235,12 +228,12 @@ void stepFSM()
                     {
                         debug(statusToString(currentStatus));debug(F("\tmaxTemp updated from ")); debug(maxTemp); debug(F(" to ")); debugln(valveTemp);
                         maxTemp = valveTemp;
-                        desiredTemp = getDesiredTemp(valveTemp);
                     }
+                    desiredTemp = maxTemp - COOLING_DELTA_THRESHOLD;
 
                     debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
 
-                    if(!isTriggerActive() && valveTemp < desiredTemp)
+                    if(!isTriggerActive() && valveTemp <= desiredTemp)
                     {
                         setValve(false);
                         changeStatus(OnPressureTrigger_WaitingCold);
@@ -265,16 +258,6 @@ void stepFSM()
             if(millis() - timeBeforeGettingHeaterTempMillis > TIME_BEFORE_GETTING_HEATER_TEMP)
             {
                 changeStatus(AlwaysActive_GettingHotWater);
-
-                heaterTempPMillis = 0;
-
-                getHeaterTempIfNecessary(&lastHeaterTemp);
-                if(valveTemp > getDesiredTemp(lastHeaterTemp))
-                {
-                    debug(statusToString(currentStatus));debugln(F("\tHot start detected"));
-                    hotStart = true;
-                }
-
                 heaterTempPMillis = 0;
             }
             break;
@@ -301,8 +284,8 @@ void stepFSM()
 
                         changeStatus(AlwaysActive_Idle);
 
-                        desiredTemp = MIN_ALLOWED_TEMP;
-                        maxTemp = MIN_ALLOWED_TEMP;
+                        maxTemp = valveTemp;
+                        desiredTemp = maxTemp - COOLING_DELTA_THRESHOLD;
                         progressMinTemp = valveTemp;
                     }
                 }
@@ -318,15 +301,14 @@ void stepFSM()
                 {
                     debug(statusToString(currentStatus));debug(F("\tmaxTemp updated from ")); debug(maxTemp); debug(F(" to ")); debugln(valveTemp);
                     maxTemp = valveTemp;
-                    desiredTemp = getDesiredTemp(valveTemp);
                 }
+                desiredTemp = maxTemp - COOLING_DELTA_THRESHOLD;
 
                 debug(statusToString(currentStatus));debug(F("\tValve temp: ")); debug(valveTemp); debug(F("\tDesired temp: ")); debugln(desiredTemp);
 
-                if(!isTriggerActive() && valveTemp < desiredTemp)
+                if(!isTriggerActive() && valveTemp <= desiredTemp)
                 {
                     changeStatus(AlwaysActive_TransitionToGettingHotWater);
-                    hotStart = false;
                     timeBeforeGettingHeaterTempMillis = millis();
                     debug(F("Waiting ")); debug(TIME_BEFORE_GETTING_HEATER_TEMP/1000); debugln(F(" seconds to get accurate temperature readings"));
                     progressMinTemp = getValveTemp() - FADE_MIN_TEMP_OFFSET;
