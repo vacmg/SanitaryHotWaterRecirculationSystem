@@ -14,6 +14,6 @@ double getValvePressure(bool ignoreErrors = false);
 bool isTriggerActive();
 int getHeaterTemp(bool ignoreErrors = false);
 bool getHeaterTempIfNecessary(int* temp);
-float getDesiredTemp(const float temp, Status status = currentStatus);
+float getDesiredTemp(const float temp);
 
 #endif //VALVE_SIDE_SENSORS_H

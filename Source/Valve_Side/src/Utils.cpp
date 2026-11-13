@@ -60,7 +60,6 @@ void printSystemInfo()
     Serial.print(F(    "Comms message max length: ")); Serial.println(SC_MAX_MESSAGE_SIZE);
     Serial.print(F(    "Mode: ")); Serial.println(modeToString(currentMode));
     Serial.print(F(    "Status: ")); Serial.println(statusToString(currentStatus));
-    Serial.print(F(    "Hot Start: ")); Serial.println(hotStart?F("ACTIVE"):F("INACTIVE"));
 }
 
 void printSensorsInfo()

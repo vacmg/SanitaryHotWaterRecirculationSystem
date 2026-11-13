@@ -225,12 +225,7 @@ bool getHeaterTempIfNecessary(int* temp)
     return false;
 }
 
-float getDesiredTemp(const float temp, Status status)
+float getDesiredTemp(const float temp)
 {
-    if( (status == OnPressureTrigger_DrivingWater || status == AlwaysActive_GettingHotWater) && !hotStart)
-    {
-        return temp*HOT_WATER_TEMPERATURE_MULTIPLIER;
-    }
-
-    return temp*COLD_WATER_TEMPERATURE_MULTIPLIER;
+    return temp*TARGET_TEMPERATURE_MULTIPLIER;
 }
