@@ -28,9 +28,9 @@ void checkResetTime()
         (currentStatus == OnPressureTrigger_ServingWater);
 
     if(
+        !servingHotWater &&
         (currentMode != ErrorFallBackMode) &&
-        (millis() > SYSTEM_RESET_PERIOD) &&
-        !servingHotWater
+        (millis() > SYSTEM_RESET_PERIOD)
     )
     {
         raiseError(NO_ERROR, F("INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout"));
