@@ -23,7 +23,15 @@
 #if ENABLE_AUTO_RESTART
 void checkResetTime()
 {
-    if((currentMode != ErrorFallBackMode) && (millis() > SYSTEM_RESET_PERIOD))
+    const bool servingHotWater =
+        (currentMode == OnPressureTrigger) &&
+        (currentStatus == OnPressureTrigger_ServingWater);
+
+    if(
+        (currentMode != ErrorFallBackMode) &&
+        (millis() > SYSTEM_RESET_PERIOD) &&
+        !servingHotWater
+    )
     {
         raiseError(NO_ERROR, F("INFO: Restarting the system due to SYSTEM_RESET_PERIOD timeout"));
     }
